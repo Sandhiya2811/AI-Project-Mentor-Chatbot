@@ -78,3 +78,92 @@ task-progression flow, LLM-offline behaviour).
 * Emoji are stripped from display (Tk 8.6 cannot render them reliably). No drag-and-drop upload (use the button).
 * Conversation memory is the last ~14 messages plus project/task context rebuilt from the database each turn.
 * Notes may be generated in a language the model handles poorly; use a stronger model for Indic languages.
+
+
+# Git and GitHub – Push Code from VS Code (Windows)
+
+## Step 1: Open VS Code Terminal
+
+1. Open your project folder in VS Code.
+2. Open the terminal using `Ctrl + ~`.
+3. Make sure the terminal is in your project directory.
+4. Select PowerShell as the terminal.
+
+## Step 2: Initialize Git
+
+Run the following commands one by one:
+
+```bash
+git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+```
+
+## Step 3: Connect GitHub Repository
+
+Create a new repository on GitHub.
+
+Copy your repository URL and run:
+
+```bash
+git remote add origin https://github.com/USERNAME/REPOSITORY.git #git remote add origin https://github.com/Sandhiya2811/AI-Project-Mentor-Chatbot.git
+
+git push -u origin main
+```
+
+Replace `USERNAME` with your GitHub username and `REPOSITORY` with your repository name.
+
+## Step 4: Push Updated Code
+
+Whenever you make changes to your project, use these commands:
+
+```bash
+git add .
+git commit -m "Updated project"
+git push
+```
+
+## Step 5: Check Git Status
+
+To check modified and staged files:
+
+```bash
+git status
+```
+
+## Useful Git Commands
+
+| Command | Description |
+|---|---|
+| `git init` | Initialize Git |
+| `git add .` | Stage all changes |
+| `git commit -m "message"` | Save changes |
+| `git push` | Upload code to GitHub |
+| `git pull` | Get latest code |
+| `git status` | Check file status |
+| `git remote -v` | View remote repository |
+| `git log --oneline` | View commit history |
+
+## Important: Create a .gitignore File
+
+Before pushing your project, create a `.gitignore` file in the root directory.
+
+Add:
+
+```gitignore
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.db
+.DS_Store
+.vscode/
+```
+
+**Note:** Never upload passwords, API keys, secret tokens, or sensitive environment variables to GitHub.
+
+## Conclusion
+
+You can use VS Code Terminal with Git commands to manage your project and push code to GitHub easily.
