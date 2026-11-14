@@ -1,0 +1,9 @@
+.env
+__pycache__/
+storage/mentor.db*
+storage/settings.json
+storage/app.log
+storage/uploads/*
+storage/index/*
+!storage/uploads/.gitkeep
+!storage/index/.gitkeep

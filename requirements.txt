@@ -1,0 +1,14 @@
+# --- required ---
+customtkinter>=5.2.2
+requests>=2.31
+numpy>=1.24
+faiss-cpu>=1.7.4          # vector search for the RAG knowledge base (numpy fallback is used if missing)
+
+# --- recommended (static analysis / testing of Python submissions) ---
+ruff>=0.5
+pytest>=8.0
+
+# --- optional ---
+pypdf>=4.0                # read PDF submissions / PDF knowledge documents
+python-docx>=1.1          # read DOCX submissions
+# sentence-transformers   # multilingual semantic embeddings (set EMBEDDING_BACKEND=sentence-transformers)
