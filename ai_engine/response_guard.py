@@ -88,3 +88,52 @@ def check(text: str, max_lines: int = MAX_SNIPPET_LINES) -> GuardResult:
     flush()
     cleaned = "\n".join(out)
     return GuardResult(not violations, cleaned, violations)
+
+
+class StreamGuard:
+    """Filters text *while it streams*, so the student sees the answer progressively but never sees forbidden code.
+
+    Plain text is passed through immediately. A fenced block (```) is held back until its closing fence arrives and
+    is then judged by `check()` - it is shown as-is or replaced by NOTICE. `finish()` flushes what is left. The final
+    stored answer is still produced by a full `check()` on the complete text (it also catches unfenced code).
+    """
+
+    def __init__(self, max_lines: int = MAX_SNIPPET_LINES) -> None:
+        self.max_lines = max_lines
+        self.pending = ""
+        self.fence = ""
+        self.in_fence = False
+
+    def _judge(self, block: str) -> str:
+        return check(block, self.max_lines).text
+
+    def feed(self, chunk: str) -> str:
+        self.pending += chunk
+        out: list[str] = []
+        while True:
+            if not self.in_fence:
+                i = self.pending.find("```")
+                if i == -1:
+                    hold = len(self.pending) - len(self.pending.rstrip("`"))  # maybe the start of a fence
+                    hold = min(hold, 2)
+                    out.append(self.pending[: len(self.pending) - hold])
+                    self.pending = self.pending[len(self.pending) - hold:]
+                    break
+                out.append(self.pending[:i])
+                self.fence, self.pending, self.in_fence = self.pending[i:], "", True
+            self.fence += self.pending
+            self.pending = ""
+            nl = self.fence.find("\n")
+            j = self.fence.find("```", nl + 1) if nl != -1 else -1
+            if j == -1:
+                break
+            block, rest = self.fence[: j + 3], self.fence[j + 3:]
+            out.append(self._judge(block))
+            self.fence, self.in_fence, self.pending = "", False, rest
+        return "".join(out)
+
+    def finish(self) -> str:
+        out = self._judge(self.fence) if self.in_fence else ""
+        out += self.pending
+        self.pending, self.fence, self.in_fence = "", "", False
+        return out

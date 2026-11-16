@@ -93,7 +93,7 @@ class _Dialog(ctk.CTkToplevel):
 
 class ProfileDialog(_Dialog):
     def __init__(self, master, user: dict, on_save):
-        super().__init__(master, "User Profile", "420x360")
+        super().__init__(master, "User Profile", "420x390")
         self.on_save = on_save
         self.name = ctk.StringVar(value=user["name"])
         self.lang = ctk.StringVar(value=user["preferred_language"])
@@ -101,7 +101,8 @@ class ProfileDialog(_Dialog):
         pad = dict(padx=24, anchor="w")
         ctk.CTkLabel(self, text="Display name").pack(pady=(20, 2), **pad)
         ctk.CTkEntry(self, textvariable=self.name, width=360).pack(**pad)
-        ctk.CTkLabel(self, text="Preferred language (replies and learning notes)").pack(pady=(14, 2), **pad)
+        ctk.CTkLabel(self, text="Language for learning notes (chat replies always follow the language you write in)",
+                     wraplength=360, justify="left").pack(pady=(14, 2), **pad)
         ctk.CTkOptionMenu(self, values=LANGUAGES, variable=self.lang, width=360).pack(**pad)
         ctk.CTkLabel(self, text="Skill level").pack(pady=(14, 2), **pad)
         ctk.CTkOptionMenu(self, values=["beginner", "intermediate", "advanced"], variable=self.level, width=360).pack(**pad)

@@ -1,169 +1,158 @@
 # AI Project Mentor
 
-A desktop (CustomTkinter) AI mentor that guides a student from a project idea to a validated, finished project -
-**one task at a time**, without ever handing over finished code.
+A desktop AI mentor (Python + CustomTkinter) that guides a student from a project idea to a validated, finished
+project, **one task at a time**, without handing over finished code. The student writes in English, Tamil, Tanglish,
+Hindi, Telugu, Malayalam, Kannada or any language the configured model supports; the mentor answers in that language.
 
-```bash
+> Documentation: [docs/PROJECT_DOCUMENTATION.md](docs/PROJECT_DOCUMENTATION.md) (technical, for maintainers) and
+> [docs/USER_GUIDE.md](docs/USER_GUIDE.md) (for students).
+
+---
+
+## Windows installation and first run (start to finish)
+
+All commands are **PowerShell** commands. Supported Python: **3.9 or newer**. Developed and tested on Python 3.12;
+on Windows use **3.11 or 3.12** (the `faiss-cpu` and `numpy` packages publish ready-made Windows packages for them).
+
+### Step 1 - Install Python
+1. Open the official download page: <https://www.python.org/downloads/windows/> and download the latest
+   **Windows installer (64-bit)** for Python 3.12 (or 3.11).
+2. Run the installer. On the first screen **tick "Add python.exe to PATH"** and keep the default **"Install launcher for
+   all users"**. Click **Install Now**. (Under *Customize installation* make sure **"tcl/tk and IDLE"** stays ticked -
+   the application window needs it.)
+3. Open a **new** PowerShell window and verify:
+   ```powershell
+   py --version
+   py -c "import tkinter; print('Tk', tkinter.TkVersion)"
+   ```
+   The first command prints e.g. `Python 3.12.x`; the second prints `Tk 8.6`. If the second fails, re-run the installer
+   and choose *Modify > tcl/tk and IDLE*.
+
+### Step 2 - Open the project folder
+Unzip the project (e.g. to `C:\Projects\ai_project_mentor`), then either
+* **VS Code:** *File > Open Folder...* > select `ai_project_mentor`, then *Terminal > New Terminal* (PowerShell), or
+* **PowerShell:**
+  ```powershell
+  cd C:\Projects\ai_project_mentor
+  ```
+Check you are in the right folder: `dir` must list `main.py`, `requirements.txt` and `.env.example`.
+
+### Step 3 - Create a virtual environment
+```powershell
+py -m venv .venv
+```
+
+### Step 4 - Activate it
+```powershell
+.venv\Scripts\Activate.ps1
+```
+The prompt now starts with `(.venv)`.
+
+*If PowerShell says "running scripts is disabled on this system"*, allow scripts **for this window only** and retry:
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.venv\Scripts\Activate.ps1
+```
+(Permanent alternative for your user: `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`. Or use
+Command Prompt and `.venv\Scripts\activate.bat`.)
+
+### Step 5 - Install the dependencies
+```powershell
+py -m pip install --upgrade pip
 pip install -r requirements.txt
-python main.py
 ```
+Required: `customtkinter`, `requests`, `numpy`, `faiss-cpu`. Recommended: `ruff` (Python lint), `pytest`. Optional: `pypdf`,
+`python-docx`. If `faiss-cpu` cannot be installed on your Python version, delete that line from `requirements.txt` and
+install again - the application then uses a slower NumPy search (works the same).
 
-Python 3.9+. On Linux you may also need Tk: `sudo apt install python3-tk`.
+### Step 6 - Configure the environment (`.env`) and the AI model
+1. Create your settings file and open it:
+   ```powershell
+   Copy-Item .env.example .env
+   notepad .env
+   ```
+2. The variables (all optional except the model choice):
 
-## First run
-1. Install an LLM backend, e.g. [Ollama](https://ollama.com): `ollama pull llama3.1` (any model that follows JSON
-   instructions works; bigger = better roadmaps and reviews). Or open **Settings** and choose OpenAI, Anthropic or any
-   OpenAI-compatible server and paste the key. Use **Test AI connection**.
-2. `python main.py` - the home screen shows **Create Your Project**. Describe an idea (or click an example) and press
-   **Start Your Project**.
-3. The mentor creates a roadmap, explains Task 1 and waits. Do the task yourself, then switch the input to
-   **Submit for review** and either type your written answer or **Upload file** (files / ZIP of your project).
-4. A review report appears. *Passed* unlocks the next task; otherwise fix and resubmit.
+   | Variable | Meaning |
+   |---|---|
+   | `LLM_PROVIDER` | `ollama` (local), `openai`, `anthropic` or `openai_compatible` (LM Studio, Groq, OpenRouter...) |
+   | `LLM_MODEL` | Model name, e.g. `llama3.2:3b`. For Ollama it must appear in `ollama list`. |
+   | `LLM_BASE_URL` | Server URL. Empty = provider default (Ollama: `http://localhost:11434`). |
+   | `LLM_API_KEY` | Key for cloud providers (or set `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`). Keep it private; never share `.env`. |
+   | `LLM_TEMPERATURE`, `LLM_TIMEOUT` | Creativity (0-1) and seconds to wait for the model. |
+   | `LLM_NUM_CTX`, `LLM_KEEP_ALIVE` | Ollama speed settings: context size (default 4096) and how long the model stays loaded (default 30m). |
+   | `CHAT_MAX_TOKENS` | Longest normal answer (default 900). Lower = faster. |
+   | `AUTO_AI_NOTES` | `idle` writes AI learning notes only while you are not chatting; `off` disables it. |
+   | `EMBEDDING_BACKEND` | `hash` (default, offline), `sentence-transformers` or `ollama`. |
+   | `THEME` | `dark`, `light` or `system`. |
+   | `CODE_EXECUTION` | `auto` or `off`. On Windows student code is **never executed** (see Limitations). |
 
-## How the main rules are enforced (not just prompted)
-| Rule | Enforcement |
+3. **Ollama (local model, free):**
+   * Install from <https://ollama.com/download/windows> and start it (it runs in the system tray).
+   * Download a model (new PowerShell window):
+     ```powershell
+     ollama pull llama3.2:3b
+     ollama list
+     ```
+   * Put the same name in `.env`: `LLM_MODEL=llama3.2:3b`.
+   * **Choosing a model:** small models (3B) answer fast but are weaker at Tamil/Tanglish and at planning roadmaps; 7-8B
+     models (`llama3.1:8b`, `qwen2.5:7b`) are better but need a good CPU/GPU and 8+ GB RAM. Measure your machine (below).
+4. **Cloud provider instead:** set `LLM_PROVIDER=openai` (or `anthropic`), the model name and `LLM_API_KEY`.
+5. **Verify the connection** (either way works):
+   * the start-up text printed by `py main.py` shows `LLM provider : ollama -> OK`, or
+   * in the app: **Settings > Test AI connection**.
+6. **Measure the speed of your model** (optional but recommended):
+   ```powershell
+   py main.py --benchmark
+   ```
+   It prints the time to the *first token* (what the student waits for), tokens per second and model-load time.
+
+### Step 7 - Start the application
+```powershell
+py main.py
+```
+What happens: the terminal prints the database path, LLM status, RAG backend and sandbox status; the SQLite database
+`storage\mentor.db` is created on first run; the knowledge index is built in the background; if Ollama is the provider the
+model is loaded into memory in the background; then the desktop window opens on **Create Your Project**. Keep the
+terminal open: errors and per-answer timings (`chat timings: ...`) are printed there and written to `storage\app.log`.
+
+> With the virtual environment active, `py main.py` uses it. If you ever see `ModuleNotFoundError`, run
+> `.venv\Scripts\python.exe main.py` instead.
+
+### Step 8 - Troubleshooting (Windows)
+| Problem | Solution |
 |---|---|
-| No complete code | System prompt **and** `ai_engine/response_guard.py`, applied to chat replies, review text, task text and learning notes. Function/class definitions and blocks over 3 lines are replaced by a notice; one automatic retry asks the model to rewrite with pseudocode. It is a heuristic - it can miss cleverly disguised code or occasionally remove harmless text. |
-| One task at a time | Tasks are `locked/active/passed` in SQLite. Only `progress_tracker.mark_passed` (called by the review engine) unlocks the next one. Locked tasks are never shown to the LLM. |
-| Not LLM-opinion-only approval | `validation/validation_engine.py`: rule checks decide; the LLM reviewer can only make the verdict **stricter**. If the AI is offline, rule checks alone can pass work and the report says so. |
-| Project-only scope | System prompt makes the model emit an off-topic token; the app replaces it with the fixed reply. |
-| Multilingual | `language_detector.py` detects Tamil/Hindi/Telugu/Kannada/Malayalam... scripts plus Tanglish/Hinglish and tells the LLM to answer in kind (or in your preferred language from User Profile). Quality depends on the model you choose. |
+| `py` / `python` is not recognized | Python is not installed or not on PATH. Re-run the installer, tick **Add python.exe to PATH**, open a *new* PowerShell. Try `py --version`. |
+| `.venv\Scripts\Activate.ps1 cannot be loaded because running scripts is disabled` | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, then activate again (Step 4). |
+| `Missing packages: customtkinter...` printed by `main.py` | The environment is not active or dependencies are missing: activate `.venv`, then `pip install -r requirements.txt`. |
+| `ModuleNotFoundError: No module named 'customtkinter'` (or `numpy`, `requests`) | Same cause. Check `(.venv)` is in the prompt; run `.venv\Scripts\python.exe -m pip install -r requirements.txt`. |
+| `ModuleNotFoundError: No module named '_tkinter'` / `No module named 'tkinter'` | Re-run the Python installer > Modify > tick **tcl/tk and IDLE**. |
+| `Could not find a version that satisfies the requirement faiss-cpu` | Your Python version has no wheel. Use Python 3.11/3.12, or remove the `faiss-cpu` line (NumPy fallback). |
+| Start-up shows `Ollama is not reachable at http://localhost:11434` | Ollama is not running: start the Ollama app (or `ollama serve`). Check `LLM_BASE_URL` if you changed the port. |
+| `Ollama is running but model 'x' is not installed` / `HTTP 404 ... check the model name` | `ollama list` shows the real names; run `ollama pull <name>` and make `LLM_MODEL` identical (including `:3b`). |
+| The first answer takes very long, later ones are faster | The model was loading into memory. The app warms it up at start; wait for the first answer once, or use a smaller model. Run `py main.py --benchmark`. |
+| `rejected the API key (HTTP 401)` | Wrong or missing `LLM_API_KEY`. Fix it in Settings or `.env`. |
+| Database error / `database is locked` / corrupted DB | Close all copies of the app. The database is `storage\mentor.db`; to start clean, close the app and rename that file (your old data stays in the renamed file). |
+| App window does not open / no output | Run it from PowerShell (not by double-click) to see the error. Check `storage\app.log`. |
+| "Port" problems | Not applicable: the application is a desktop program and opens no web server. Only Ollama uses a port (11434). |
 
-## Validation engine
-* **Rule checks** (generated per task by the roadmap, executed deterministically): source present, file exists,
-  syntax valid, terms used, functions/classes defined, text mentions required topics, minimum words, tests present,
-  tests pass, runs OK.
-* **Static analysis** (nothing is executed): Python - `ast` + `ruff`; JavaScript - `node --check`; PHP - `php -l`;
-  Ruby - `ruby -c`; Go - `gofmt -e`; C/C++ - `gcc`/`g++ -fsyntax-only`; Java - `javac -proc:none`; R - `parse()`;
-  SQL - `sqlfluff`; HTML - tag balance. A tool that is not installed is listed under *Checks that could not be performed*.
-  **Not integrated** (suggested in the brief): ESLint, Checkstyle, PHPStan, Lintr, Semgrep, Tree-sitter, Pylint -
-  add them in `validation/static_analyzer.py`.
-* **Test execution** is implemented for **Python only** (pytest/unittest) and runs only when the OS can isolate the network
-  (Linux with `unshare`). Elsewhere student code is never executed. Limits: wall-clock timeout, CPU/file/memory rlimits,
-  throw-away copy of the files. It does **not** limit process count. Missing third-party modules in the validation
-  environment are reported as "could not be checked", not as student failure.
-* Uploads: extension allow-list, size/file-count limits, zip-slip/symlink/zip-bomb protection (`utils/security.py`).
-  Images are stored but their content is not analysed.
+---
 
-## RAG
-`storage/knowledge/` holds concise bundled notes; drop your own `.md`, `.txt` or `.pdf` files there and press
-**Settings > Rebuild knowledge index**. Retrieval uses FAISS. The default `hash` embeddings work offline but are lexical
-(English keywords); for semantic/multilingual retrieval set `EMBEDDING_BACKEND=sentence-transformers` or `ollama`.
-
-## Data
-SQLite at `storage/mentor.db` (users, projects, project_requirements, tasks, student_submissions, uploaded_files,
-validation_reports, conversations, chat_messages, learning_notes, project_progress, activity_logs). Uploaded files are
-kept in `storage/uploads/<project>/<submission>/`. Settings (including an API key if you enter one) are saved in
-`storage/settings.json` (owner-only permissions where the OS allows). Deleting a conversation keeps the project;
-**Previous Projects > Resume** reopens it.
-
-## When the LLM is down
-Clear message in chat; browsing history/projects, Learning Resources (offline notes with official-doc links and local
-knowledge excerpts), and rule-based review of submissions keep working. New projects get a clearly labelled generic
-template roadmap.
-
-## Project layout
-Matches the brief: `interface/`, `ai_engine/`, `project_manager/`, `code_review/`, `validation/`, `rag/`, `learning/`,
-`database/`, `storage/`, `utils/` (plus `interface/markdown_text.py`, `resources_view.py`, `settings_view.py`,
-`validation/executor.py`, `utils/sandbox.py`).
-
-## Tests
-`python -m pytest -q` runs backend tests with a scripted fake LLM (guard, language detection, zip safety, full
-task-progression flow, LLM-offline behaviour).
-
-## Known limitations
-* Developed and smoke-tested on Linux (headless Xvfb) with a **fake LLM**; it has not been run against a real model
-  or on Windows/macOS here, so expect to tune prompts for your model. Small local models may return invalid roadmaps
-  (the app retries once, then falls back to the template roadmap).
-* Emoji are stripped from display (Tk 8.6 cannot render them reliably). No drag-and-drop upload (use the button).
-* Conversation memory is the last ~14 messages plus project/task context rebuilt from the database each turn.
-* Notes may be generated in a language the model handles poorly; use a stronger model for Indic languages.
-
-
-# Git and GitHub – Push Code from VS Code (Windows)
-
-## Step 1: Open VS Code Terminal
-
-1. Open your project folder in VS Code.
-2. Open the terminal using `Ctrl + ~`.
-3. Make sure the terminal is in your project directory.
-4. Select PowerShell as the terminal.
-
-## Step 2: Initialize Git
-
-Run the following commands one by one:
-
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
+## Other commands
+```powershell
+py -m pytest -q                 # run the automated tests (40 tests, fake LLM, no GPU needed)
+py main.py --benchmark          # measure time-to-first-token / tokens per second of YOUR model
+py main.py --check-links        # check that every curated learning link still opens (needs internet)
 ```
 
-## Step 3: Connect GitHub Repository
+## What the application does (short)
+* Create a project from an idea -> personalised roadmap -> guided **one task at a time**.
+* Understands what the student means (task questions, "next", "I understand", libraries, errors, any task or the
+  whole roadmap) using the real project state; progress changes **only** after a successful validation.
+* Students submit files/ZIPs or written answers -> hybrid validation (rule checks + static analysis + AI review).
+* Learning Resources with **official, curated links** for every recommended technology.
+* Answers stream in progressively; language follows each message automatically.
+* Strict no-code policy (prompt + independent response guard) and project-only scope.
 
-Create a new repository on GitHub.
-
-Copy your repository URL and run:
-
-```bash
-git remote add origin https://github.com/USERNAME/REPOSITORY.git #git remote add origin https://github.com/Sandhiya2811/AI-Project-Mentor-Chatbot.git
-
-git push -u origin main
-```
-
-Replace `USERNAME` with your GitHub username and `REPOSITORY` with your repository name.
-
-## Step 4: Push Updated Code
-
-Whenever you make changes to your project, use these commands:
-
-```bash
-git add .
-git commit -m "Updated project"
-git push
-```
-
-## Step 5: Check Git Status
-
-To check modified and staged files:
-
-```bash
-git status
-```
-
-## Useful Git Commands
-
-| Command | Description |
-|---|---|
-| `git init` | Initialize Git |
-| `git add .` | Stage all changes |
-| `git commit -m "message"` | Save changes |
-| `git push` | Upload code to GitHub |
-| `git pull` | Get latest code |
-| `git status` | Check file status |
-| `git remote -v` | View remote repository |
-| `git log --oneline` | View commit history |
-
-## Important: Create a .gitignore File
-
-Before pushing your project, create a `.gitignore` file in the root directory.
-
-Add:
-
-```gitignore
-.env
-.venv/
-venv/
-__pycache__/
-*.pyc
-*.db
-.DS_Store
-.vscode/
-```
-
-**Note:** Never upload passwords, API keys, secret tokens, or sensitive environment variables to GitHub.
-
-## Conclusion
-
-You can use VS Code Terminal with Git commands to manage your project and push code to GitHub easily.
+See [docs/PROJECT_DOCUMENTATION.md](docs/PROJECT_DOCUMENTATION.md) for details and
+[Known limitations](docs/PROJECT_DOCUMENTATION.md#21-limitations).

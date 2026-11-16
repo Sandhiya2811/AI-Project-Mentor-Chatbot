@@ -35,9 +35,12 @@ def normalize_stage(stage: dict) -> dict | None:
             checks.append({"type": "syntax_valid", "description": "No syntax errors", "params": {}, "required": True})
     elif "text_min_words" not in have:
         checks.insert(0, {"type": "text_min_words", "description": "A real written answer (not just a few words)", "params": {"min": 30}, "required": True})
+    as_list = lambda v: [x for x in (v if isinstance(v, list) else []) if str(x).strip()]  # noqa: E731
     return {"title": str(stage["title"]).strip()[:100], "description": _guard(stage.get("description")),
             "expected_output": _guard(stage.get("expected_output") or "Submit your work for this task."),
-            "deliverable_type": kind, "hints": [_guard(h) for h in (stage.get("hints") or [])][:4], "checks": checks}
+            "deliverable_type": kind, "hints": [_guard(h) for h in as_list(stage.get("hints"))][:4],
+            "subtasks": [_guard(x)[:160] for x in as_list(stage.get("subtasks"))][:6],
+            "tools": [str(x).strip()[:40] for x in as_list(stage.get("tools"))][:6], "checks": checks}
 
 
 def final_task(language: str) -> dict:
@@ -57,7 +60,10 @@ def final_task(language: str) -> dict:
             "expected_output": "One ZIP containing the full project folder (source, tests, README, dependency list).",
             "deliverable_type": "code",
             "hints": ["Run the project from a clean folder following your own README.",
-                      "Make sure every file you reference is inside the ZIP."], "checks": checks}
+                      "Make sure every file you reference is inside the ZIP."],
+            "subtasks": ["Re-run everything from a clean folder", "Write or update the README",
+                         "Make sure tests exist and pass", "Zip the project folder and submit it"],
+            "tools": [language], "checks": checks}
 
 
 def generate(analysis: dict, skill: str = "beginner") -> list[dict]:
@@ -70,7 +76,7 @@ def generate(analysis: dict, skill: str = "beginner") -> list[dict]:
     last = None
     for _ in range(2):
         try:
-            data = extract_json(llm.chat(msgs, temperature=0.3, max_tokens=6000, json_mode=True))
+            data = extract_json(llm.chat(msgs, temperature=0.3, max_tokens=3500, json_mode=True))
             stages = data.get("stages") if isinstance(data, dict) else data
             tasks = [t for t in (normalize_stage(s) for s in stages or []) if t][:9]
             if len(tasks) >= 3:
@@ -97,7 +103,8 @@ def template_roadmap(analysis: dict) -> list[dict]:
         ("Documentation", "Write a README that explains purpose, setup, usage and limitations.",
          "A README file.", "text", ["Write for someone who has never seen the project."]),
     ]
-    tasks = [normalize_stage({"title": t, "description": d, "expected_output": o, "deliverable_type": k, "hints": h, "checks": []})
+    tasks = [normalize_stage({"title": t, "description": d, "expected_output": o, "deliverable_type": k, "hints": h,
+                              "subtasks": h, "tools": [lang], "checks": []})
              for t, d, o, k, h in stages]
     tasks[4]["checks"].append({"type": "tests_present", "description": "Test files are included", "params": {}, "required": True})
     tasks[5]["checks"].append({"type": "text_min_words", "description": "README has real content (min. 60 words)", "params": {"min": 60}, "required": True})

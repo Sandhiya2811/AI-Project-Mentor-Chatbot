@@ -56,6 +56,11 @@ DEFAULTS = {
     "EMBEDDING_MODEL": "",
     "THEME": "dark",  # dark | light | system
     "CODE_EXECUTION": "auto",  # auto (only if network isolation exists) | off
+    # --- speed tuning ---
+    "LLM_NUM_CTX": "4096",  # Ollama context window (prompts are ~1.5-2.5k tokens); keep it constant so the model is never reloaded
+    "LLM_KEEP_ALIVE": "30m",  # Ollama: keep the model in memory between messages
+    "CHAT_MAX_TOKENS": "900",  # upper bound for a normal chat answer (roadmap overviews get more)
+    "AUTO_AI_NOTES": "idle",  # idle = write AI learning notes in the background only while you are not chatting | off
 }
 
 PROVIDER_DEFAULTS = {

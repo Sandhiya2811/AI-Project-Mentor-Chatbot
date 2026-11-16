@@ -49,7 +49,8 @@ def create_project(user_id, title, idea, objective, domain, programming_language
                 "INSERT INTO tasks(project_id,position,title,description,expected_output,deliverable_type,"
                 "hints_json,checks_json,status) VALUES(?,?,?,?,?,?,?,?,?)",
                 (pid, i + 1, t["title"], t["description"], t["expected_output"], t["deliverable_type"],
-                 dumps(t.get("hints", [])), dumps(t.get("checks", [])), "active" if i == 0 else "locked")).lastrowid
+                 dumps({"hints": t.get("hints", []), "subtasks": t.get("subtasks", []), "tools": t.get("tools", [])}),
+                 dumps(t.get("checks", [])), "active" if i == 0 else "locked")).lastrowid
             first_id = first_id or tid
         c.execute("INSERT INTO project_progress(project_id,total_tasks,completed_tasks,percent,current_task_id,"
                   "last_activity) VALUES(?,?,?,?,?,?)", (pid, len(tasks), 0, 0, first_id, ts))
@@ -93,7 +94,12 @@ def list_requirements(pid: int, kind: str | None = None) -> list[dict]:
 def _task(r):
     d = _row(r)
     if d:
-        d["hints"] = loads(d.pop("hints_json"), [])
+        # hints_json holds {"hints","subtasks","tools"} (v2) or a plain hints list (projects created by v1)
+        raw = loads(d.pop("hints_json"), [])
+        if isinstance(raw, dict):
+            d["hints"], d["subtasks"], d["tools"] = raw.get("hints", []), raw.get("subtasks", []), raw.get("tools", [])
+        else:
+            d["hints"], d["subtasks"], d["tools"] = raw, [], []
         d["checks"] = loads(d.pop("checks_json"), [])
     return d
 

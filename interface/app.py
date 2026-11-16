@@ -37,6 +37,8 @@ class App(ctk.CTk):
         self.current_cid: int | None = None
         self.current_pid: int | None = None
         self.search_query = ""
+        self._notes_cancel: threading.Event | None = None   # stops AI note generation so chat always has priority
+        self._notes_job = None
         self._q: queue.Queue = queue.Queue()
         self._view = "home"
 
@@ -99,6 +101,12 @@ class App(ctk.CTk):
         ok, msg = result
         self.views["home"].set_banner("" if ok else f"AI model not ready: {msg} (Settings > AI model). "
                                                     "Non-AI features still work.")
+        if ok:  # load the model into memory now, so the first real question does not pay the loading time
+            self.run_bg(self._warm_up, None, lambda e: log.info("Model warm-up skipped: %s", e))
+
+    @staticmethod
+    def _warm_up() -> None:
+        get_provider().warm_up()
 
     # ---- navigation ------------------------------------------------------------------------------
     def _show(self, name: str) -> None:
@@ -202,55 +210,101 @@ class App(ctk.CTk):
 
     # ---- starting a project ---------------------------------------------------------------------
     def start_project(self, idea: str) -> None:
-        home = self.views["home"]
+        home, chat = self.views["home"], self.views["chat"]
         home.set_busy(True, "Analysing your idea...")
-        self.run_bg(lambda: self.mentor.start_project(idea, lambda t: self.post(lambda x: home.set_busy(True, x), t)),
-                    self._project_started, lambda e: (home.set_busy(False), self._unexpected(e)))
+        self._stop_notes()
+
+        def created(info: dict) -> None:       # the project exists: open the chat and let the intro stream in
+            home.reset()
+            self.refresh_sidebar()
+            self.open_conversation(info["conversation_id"])
+            chat.set_busy(True, "Writing your first task...")
+
+        self.run_bg(lambda: self.mentor.start_project(
+            idea, lambda t: self.post(lambda x: home.set_busy(True, x), t),
+            on_created=lambda info: self.post(created, info), on_token=lambda t: self.post(chat.stream_append, t)),
+            self._project_started, lambda e: (home.set_busy(False), chat.drop_stream(), chat.set_busy(False),
+                                              self._unexpected(e)))
 
     def _project_started(self, res: dict) -> None:
-        self.views["home"].reset()
+        chat = self.views["chat"]
+        if self.current_cid == res["conversation_id"]:
+            chat.finish_stream(res["message"])
+        chat.set_busy(False)
         self.refresh_sidebar()
-        self.open_conversation(res["conversation_id"])
-        pid, lang = res["project_id"], res["language"]
-        self.views["chat"].set_busy(False)
-        self.run_bg(lambda: notes_generator.generate_notes(pid, lang, self.user["skill_level"]), None)
+        self._schedule_notes(res["project_id"], res["language"])
+
+    # ---- AI learning notes run only when the student is idle (they would compete with chat for the model) -----------
+    def _schedule_notes(self, pid: int | None, lang: str, delay_ms: int = 40000) -> None:
+        if self._notes_job is not None:
+            self.after_cancel(self._notes_job)
+        if pid and settings.get("AUTO_AI_NOTES") != "off":
+            self._notes_job = self.after(delay_ms, lambda: self._start_notes(pid, lang))
+
+    def _start_notes(self, pid: int, lang: str, force: bool = False, on_done=None) -> None:
+        self._notes_job = None
+        self._stop_notes()
+        cancel = self._notes_cancel = threading.Event()
+        skill = self.user["skill_level"]
+        self.run_bg(lambda: notes_generator.generate_notes(pid, lang, skill, force=force, cancel=cancel,
+                                                           on_progress=lambda s: self.post(self._notes_progress, (pid, s))),
+                    on_done or self._notes_done)
+
+    def _stop_notes(self) -> None:
+        if self._notes_job is not None:
+            self.after_cancel(self._notes_job)
+            self._notes_job = None
+        if self._notes_cancel is not None:
+            self._notes_cancel.set()
+
+    def _notes_progress(self, arg) -> None:
+        pid, text = arg
+        if self._view == "resources" and self.views["resources"].current_project_id() == pid:
+            self.views["resources"].set_info(text)
+
+    def _notes_done(self, res: dict) -> None:
+        v = self.views["resources"]
+        pid = v.current_project_id()
+        if self._view == "resources" and pid:
+            v.set_notes(repo.list_notes(pid))
+            v.set_info("Paused while you were chatting - it resumes automatically when you are idle." if res.get("cancelled")
+                       else (f"AI unavailable ({res['error']}) - offline notes with official links are shown." if res.get("error")
+                             else f"{res['ai']} AI note(s) written."))
 
     # ---- sending messages ---------------------------------------------------------------------------
     def send(self, text: str, mode: str, paths: list[str]) -> None:
         if self.current_cid is None:
             return
-        chat, cid = self.views["chat"], self.current_cid
+        chat, cid, pid = self.views["chat"], self.current_cid, self.current_pid
+        self._stop_notes()                                    # the chat gets the model first
         chat.add_message({"role": "user", "content": text or "(files attached)", "kind": "chat",
                           "metadata": {"attachments": [p.replace("\\", "/").split("/")[-1] for p in paths]}})
         chat.set_busy(True, "Reviewing your submission..." if mode == "submit" else "Thinking...")
 
+        def on_token(t: str) -> None:                         # streamed pieces of the answer (worker thread -> UI thread)
+            self.post(lambda x: chat.stream_append(x) if cid == self.current_cid else None, t)
+
         def done(msgs: list[dict]) -> None:
             if cid == self.current_cid:
                 for m in msgs:
-                    chat.add_message(m)
+                    (chat.finish_stream if m is msgs[0] else chat.add_message)(m)
                 project = repo.get_project(self.current_pid)
                 chat.update_header(project, repo.get_progress(project["id"]), repo.get_active_task(project["id"]))
                 chat.set_busy(False)
             self.refresh_sidebar()
+            conv = repo.get_conversation(cid)
+            self._schedule_notes(pid, self.mentor.notes_language(self.user, conv["language"] if conv else ""))
 
-        self.run_bg(lambda: self.mentor.chat(cid, text, mode, paths, lambda s: self.post(chat.set_status, s)), done,
-                    lambda e: (chat.set_busy(False), self._unexpected(e)))
+        self.run_bg(lambda: self.mentor.chat(cid, text, mode, paths, lambda s: self.post(chat.set_status, s), on_token),
+                    done, lambda e: (chat.drop_stream(), chat.set_busy(False), self._unexpected(e)))
 
     # ---- notes / settings -----------------------------------------------------------------------
     def regenerate_notes(self, pid: int) -> None:
         v = self.views["resources"]
         conv = repo.get_conversation_for_project(pid)
         lang = self.mentor.notes_language(self.user, conv["language"] if conv else "")
-        v.set_info(f"Generating notes in {lang}... this can take a minute.")
-
-        def done(res):
-            v.set_info(res["error"] and f"AI unavailable ({res['error']}) - offline notes shown." or
-                       f"Generated {res['ai']} AI note(s).")
-            if v.current_project_id() == pid:
-                v.set_notes(repo.list_notes(pid))
-
-        self.run_bg(lambda: notes_generator.generate_notes(
-            pid, lang, self.user["skill_level"], force=True, on_progress=lambda s: self.post(v.set_info, s)), done)
+        v.set_info(f"Generating notes in {lang}... they appear as they finish (chatting pauses this).")
+        self._start_notes(pid, lang, force=True, on_done=self._notes_done)
 
     def save_settings(self, values: dict) -> None:
         old_embed = (settings.get("EMBEDDING_BACKEND"), settings.get("EMBEDDING_MODEL"))

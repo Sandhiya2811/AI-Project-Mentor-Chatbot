@@ -131,7 +131,7 @@ def test_full_flow(mentor, tmp_path):
     # guard retry + off-topic
     reply = mentor.chat(cid, "give me code please")[0]
     assert "def full_solution" not in reply["content"]
-    assert "pseudocode" in reply["content"]
+    assert "code removed" in reply["content"].lower()   # streaming guard replaces the block inline (no second LLM call)
     assert mentor.chat(cid, "what is the weather today")[0]["content"] == prompts.OFF_TOPIC_REPLY
 
     # too-short written answer -> not approved, next task stays locked

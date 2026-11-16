@@ -48,6 +48,12 @@ class Bubble(ctk.CTkFrame):
         self._pending = False
         md.fit_height(self.text)
 
+    def set_text(self, text: str) -> None:
+        """Replace the content (used while an answer streams in, and to swap in the final guarded text)."""
+        self.text_value = text
+        md.render(self.text, text)
+        md.fit_height(self.text)
+
     def _copy(self) -> None:
         self.clipboard_clear()
         self.clipboard_append(self.text_value)
@@ -59,6 +65,9 @@ class ChatView(ctk.CTkFrame):
         self.on_send, self.on_new_chat, self.on_roadmap = on_send, on_new_chat, on_roadmap
         self.paths: list[str] = []
         self.busy = False
+        self._stream: Bubble | None = None       # bubble of the answer that is currently streaming in
+        self._stream_text = ""
+        self._flush_job = None
 
         top = ctk.CTkFrame(self, fg_color=theme.color("bg"), corner_radius=0)
         top.pack(fill="x", padx=24, pady=(14, 4))
@@ -114,6 +123,7 @@ class ChatView(ctk.CTkFrame):
 
     # ---- transcript ---------------------------------------------------------------------------
     def clear_transcript(self) -> None:
+        self.drop_stream()
         for child in self.scroll.winfo_children():
             child.destroy()
 
@@ -143,6 +153,49 @@ class ChatView(ctk.CTkFrame):
         self.progress_label.configure(text=f"{done}/{total} tasks")
         self.task_label.configure(text=(f"Current task {task['position']}: {strip_non_bmp(task['title'])}" if task else
                                         "Project complete" if project["status"] == "completed" else ""))
+
+    # ---- progressive display ------------------------------------------------------------------------
+    @property
+    def streaming(self) -> bool:
+        return self._stream is not None
+
+    def stream_append(self, chunk: str) -> None:
+        """Called for every piece of the answer. Redraws are coalesced (max ~16 per second)."""
+        if self._stream is None:
+            self._stream = Bubble(self.scroll, self.canvas, "assistant", "chat", "")
+            self._stream.pack(fill="x", padx=(6, 80), pady=5, anchor="w")
+            self._stream_text = ""
+            self.status.configure(text="")
+        self._stream_text += chunk
+        if self._flush_job is None:
+            self._flush_job = self.after(60, self._flush_stream)
+
+    def _flush_stream(self) -> None:
+        self._flush_job = None
+        if self._stream is not None:
+            self._stream.set_text(strip_non_bmp(self._stream_text))
+            self.canvas.yview_moveto(1.0)
+
+    def drop_stream(self) -> None:
+        if self._flush_job is not None:
+            self.after_cancel(self._flush_job)
+            self._flush_job = None
+        if self._stream is not None:
+            self._stream.destroy()
+        self._stream, self._stream_text = None, ""
+
+    def finish_stream(self, msg: dict) -> None:
+        """Swap the streamed text for the final stored message (the final text has had the complete guard pass)."""
+        if self._stream is not None and msg.get("kind", "chat") == "chat" and msg["role"] == "assistant":
+            if self._flush_job is not None:
+                self.after_cancel(self._flush_job)
+                self._flush_job = None
+            self._stream.set_text(strip_non_bmp(msg["content"]))
+            self._stream, self._stream_text = None, ""
+            self.after(80, lambda: self.canvas.yview_moveto(1.0))
+        else:
+            self.drop_stream()
+            self.add_message(msg)
 
     # ---- input ------------------------------------------------------------------------------------
     def _enter(self, event):
