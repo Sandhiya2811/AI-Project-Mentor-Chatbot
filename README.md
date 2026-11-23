@@ -4,6 +4,9 @@ A desktop AI mentor (Python + CustomTkinter) that guides a student from a projec
 project, **one task at a time**, without handing over finished code. The student writes in English, Tamil, Tanglish,
 Hindi, Telugu, Malayalam, Kannada or any language the configured model supports; the mentor answers in that language.
 
+**AI runs in the cloud** (OpenAI, Anthropic Claude, Google Gemini, Perplexity, Z.ai GLM). Nothing is downloaded to your
+computer and Ollama is **not** needed - it remains available as an optional local provider if you choose it.
+
 > Documentation: [docs/PROJECT_DOCUMENTATION.md](docs/PROJECT_DOCUMENTATION.md) (technical, for maintainers) and
 > [docs/USER_GUIDE.md](docs/USER_GUIDE.md) (for students).
 
@@ -15,27 +18,24 @@ All commands are **PowerShell** commands. Supported Python: **3.9 or newer**. De
 on Windows use **3.11 or 3.12** (the `faiss-cpu` and `numpy` packages publish ready-made Windows packages for them).
 
 ### Step 1 - Install Python
-1. Open the official download page: <https://www.python.org/downloads/windows/> and download the latest
-   **Windows installer (64-bit)** for Python 3.12 (or 3.11).
-2. Run the installer. On the first screen **tick "Add python.exe to PATH"** and keep the default **"Install launcher for
-   all users"**. Click **Install Now**. (Under *Customize installation* make sure **"tcl/tk and IDLE"** stays ticked -
-   the application window needs it.)
+1. Open <https://www.python.org/downloads/windows/> and download the latest **Windows installer (64-bit)** for Python 3.12 (or 3.11).
+2. Run the installer. On the first screen **tick "Add python.exe to PATH"**, keep **"Install launcher for all users"**, click
+   **Install Now**. (Under *Customize installation* keep **"tcl/tk and IDLE"** ticked - the application window needs it.)
 3. Open a **new** PowerShell window and verify:
    ```powershell
    py --version
    py -c "import tkinter; print('Tk', tkinter.TkVersion)"
    ```
-   The first command prints e.g. `Python 3.12.x`; the second prints `Tk 8.6`. If the second fails, re-run the installer
-   and choose *Modify > tcl/tk and IDLE*.
+   Expected: `Python 3.12.x` and `Tk 8.6`. If the second command fails, re-run the installer and choose *Modify > tcl/tk and IDLE*.
 
 ### Step 2 - Open the project folder
-Unzip the project (e.g. to `C:\Projects\ai_project_mentor`), then either
-* **VS Code:** *File > Open Folder...* > select `ai_project_mentor`, then *Terminal > New Terminal* (PowerShell), or
-* **PowerShell:**
-  ```powershell
-  cd C:\Projects\ai_project_mentor
-  ```
-Check you are in the right folder: `dir` must list `main.py`, `requirements.txt` and `.env.example`.
+Unzip the project (e.g. to `C:\Projects\ai_project_mentor`), then either **VS Code:** *File > Open Folder...* and
+*Terminal > New Terminal*, or **PowerShell:**
+```powershell
+cd C:\Projects\ai_project_mentor
+dir
+```
+`dir` must list `main.py`, `requirements.txt` and `.env.example`.
 
 ### Step 3 - Create a virtual environment
 ```powershell
@@ -46,75 +46,72 @@ py -m venv .venv
 ```powershell
 .venv\Scripts\Activate.ps1
 ```
-The prompt now starts with `(.venv)`.
-
-*If PowerShell says "running scripts is disabled on this system"*, allow scripts **for this window only** and retry:
+The prompt now starts with `(.venv)`. *If PowerShell says "running scripts is disabled on this system"*:
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .venv\Scripts\Activate.ps1
 ```
-(Permanent alternative for your user: `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`. Or use
-Command Prompt and `.venv\Scripts\activate.bat`.)
+(Permanent alternative: `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`. Or use Command Prompt and `.venv\Scripts\activate.bat`.)
 
 ### Step 5 - Install the dependencies
 ```powershell
 py -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
-Required: `customtkinter`, `requests`, `numpy`, `faiss-cpu`. Recommended: `ruff` (Python lint), `pytest`. Optional: `pypdf`,
-`python-docx`. If `faiss-cpu` cannot be installed on your Python version, delete that line from `requirements.txt` and
-install again - the application then uses a slower NumPy search (works the same).
+Required: `customtkinter`, `requests`, `numpy`, `faiss-cpu`. Recommended: `keyring` (stores API keys in **Windows Credential
+Manager**), `ruff`, `pytest`. Optional: `pypdf`, `python-docx`. If `faiss-cpu` cannot be installed on your Python
+version, delete that line and install again - the app then uses a slower NumPy search (it works the same).
 
-### Step 6 - Configure the environment (`.env`) and the AI model
-1. Create your settings file and open it:
-   ```powershell
-   Copy-Item .env.example .env
-   notepad .env
-   ```
-2. The variables (all optional except the model choice):
+### Step 6 - Choose the AI provider and enter your API key
+You need an API key from **one** provider (see the [API key guide](#api-key-setup-guide) below).
 
-   | Variable | Meaning |
-   |---|---|
-   | `LLM_PROVIDER` | `ollama` (local), `openai`, `anthropic` or `openai_compatible` (LM Studio, Groq, OpenRouter...) |
-   | `LLM_MODEL` | Model name, e.g. `llama3.2:3b`. For Ollama it must appear in `ollama list`. |
-   | `LLM_BASE_URL` | Server URL. Empty = provider default (Ollama: `http://localhost:11434`). |
-   | `LLM_API_KEY` | Key for cloud providers (or set `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`). Keep it private; never share `.env`. |
-   | `LLM_TEMPERATURE`, `LLM_TIMEOUT` | Creativity (0-1) and seconds to wait for the model. |
-   | `LLM_NUM_CTX`, `LLM_KEEP_ALIVE` | Ollama speed settings: context size (default 4096) and how long the model stays loaded (default 30m). |
-   | `CHAT_MAX_TOKENS` | Longest normal answer (default 900). Lower = faster. |
-   | `AUTO_AI_NOTES` | `idle` writes AI learning notes only while you are not chatting; `off` disables it. |
-   | `EMBEDDING_BACKEND` | `hash` (default, offline), `sentence-transformers` or `ollama`. |
-   | `THEME` | `dark`, `light` or `system`. |
-   | `CODE_EXECUTION` | `auto` or `off`. On Windows student code is **never executed** (see Limitations). |
+**Recommended - inside the app (no files to edit):**
+1. Start the app (Step 7), open **Settings > AI model**.
+2. Choose the **Provider**, pick a **Model** from the list (or type any model name your account has; **Refresh models** lists what
+   your account can use), paste the **API key**, press **Save**.
+3. The **Connection** line shows the result of a real check of your key and model (no tokens are spent). **Test connection**
+   checks what you typed *without saving it*.
 
-3. **Ollama (local model, free):**
-   * Install from <https://ollama.com/download/windows> and start it (it runs in the system tray).
-   * Download a model (new PowerShell window):
-     ```powershell
-     ollama pull llama3.2:3b
-     ollama list
-     ```
-   * Put the same name in `.env`: `LLM_MODEL=llama3.2:3b`.
-   * **Choosing a model:** small models (3B) answer fast but are weaker at Tamil/Tanglish and at planning roadmaps; 7-8B
-     models (`llama3.1:8b`, `qwen2.5:7b`) are better but need a good CPU/GPU and 8+ GB RAM. Measure your machine (below).
-4. **Cloud provider instead:** set `LLM_PROVIDER=openai` (or `anthropic`), the model name and `LLM_API_KEY`.
-5. **Verify the connection** (either way works):
-   * the start-up text printed by `py main.py` shows `LLM provider : ollama -> OK`, or
-   * in the app: **Settings > Test AI connection**.
-6. **Measure the speed of your model** (optional but recommended):
-   ```powershell
-   py main.py --benchmark
-   ```
-   It prints the time to the *first token* (what the student waits for), tokens per second and model-load time.
+The key is stored in Windows Credential Manager (when `keyring` is installed - Settings tells you where it is stored), never
+in the database, logs or `.env.example`. If you prefer files/environment variables:
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+and set `LLM_PROVIDER=...` plus the key variable of your provider (table below). `.env` is private - never commit or share it
+(`.gitignore` already excludes it). Variables you can set (all optional):
+
+| Variable | Meaning |
+|---|---|
+| `LLM_PROVIDER` | `openai` (default), `anthropic`, `google`, `perplexity`, `zai`, `ollama` (optional, local), `openai_compatible` |
+| `LLM_MODEL` | Model of the selected provider. Empty = provider default. |
+| `LLM_BASE_URL` | Server address. Empty = provider default (only for proxies / custom servers). |
+| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (or `GOOGLE_API_KEY`), `PERPLEXITY_API_KEY`, `ZAI_API_KEY` | API keys (alternative to the Settings screen) |
+| `LLM_TEMPERATURE`, `LLM_TIMEOUT` | Creativity (0-1); seconds to wait for a reply (empty = cloud 60 s, Ollama 180 s) |
+| `CHAT_MAX_TOKENS` | Longest normal answer (default 900). Lower = faster. |
+| `AUTO_AI_NOTES` | `idle` writes AI learning notes only while you are not chatting; `off` disables it. |
+| `LLM_NUM_CTX`, `LLM_KEEP_ALIVE` | Ollama only |
+| `EMBEDDING_BACKEND` | `hash` (default, offline), `sentence-transformers` or `ollama` |
+| `THEME`, `CODE_EXECUTION` | `dark`/`light`/`system`; `auto`/`off` (on Windows student code is **never executed**) |
+
+PowerShell environment variables also work, e.g. for the current window: `$env:OPENAI_API_KEY = "paste-key-here"`.
+
+**Check everything from the terminal (uses your real keys, prints no key):**
+```powershell
+py main.py --check-providers
+```
+For each provider with a key it validates key + model and times a short streamed answer (time to first text).
 
 ### Step 7 - Start the application
 ```powershell
 py main.py
 ```
-What happens: the terminal prints the database path, LLM status, RAG backend and sandbox status; the SQLite database
-`storage\mentor.db` is created on first run; the knowledge index is built in the background; if Ollama is the provider the
-model is loaded into memory in the background; then the desktop window opens on **Create Your Project**. Keep the
-terminal open: errors and per-answer timings (`chat timings: ...`) are printed there and written to `storage\app.log`.
+What happens: the terminal prints the database path, the AI provider status (e.g. `openai -> NOT READY (OpenAI API key is
+missing ...)` until you add a key), the RAG backend and the sandbox status; the SQLite database `storage\mentor.db` is created on
+first run; the knowledge index is built in the background; your provider's connection is checked in the background; then the
+desktop window opens on **Create Your Project**. The status line at the bottom of the home screen shows
+**AI connected: provider - model** in green, or what is wrong in amber. Keep the terminal open: errors and per-answer timings
+(`chat timings: ...`) are printed there and written to `storage\app.log` (API keys are masked in all logs).
 
 > With the virtual environment active, `py main.py` uses it. If you ever see `ModuleNotFoundError`, run
 > `.venv\Scripts\python.exe main.py` instead.
@@ -122,37 +119,72 @@ terminal open: errors and per-answer timings (`chat timings: ...`) are printed t
 ### Step 8 - Troubleshooting (Windows)
 | Problem | Solution |
 |---|---|
-| `py` / `python` is not recognized | Python is not installed or not on PATH. Re-run the installer, tick **Add python.exe to PATH**, open a *new* PowerShell. Try `py --version`. |
+| `py` / `python` is not recognized | Python is not installed or not on PATH. Re-run the installer, tick **Add python.exe to PATH**, open a *new* PowerShell. |
 | `.venv\Scripts\Activate.ps1 cannot be loaded because running scripts is disabled` | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, then activate again (Step 4). |
-| `Missing packages: customtkinter...` printed by `main.py` | The environment is not active or dependencies are missing: activate `.venv`, then `pip install -r requirements.txt`. |
-| `ModuleNotFoundError: No module named 'customtkinter'` (or `numpy`, `requests`) | Same cause. Check `(.venv)` is in the prompt; run `.venv\Scripts\python.exe -m pip install -r requirements.txt`. |
-| `ModuleNotFoundError: No module named '_tkinter'` / `No module named 'tkinter'` | Re-run the Python installer > Modify > tick **tcl/tk and IDLE**. |
-| `Could not find a version that satisfies the requirement faiss-cpu` | Your Python version has no wheel. Use Python 3.11/3.12, or remove the `faiss-cpu` line (NumPy fallback). |
-| Start-up shows `Ollama is not reachable at http://localhost:11434` | Ollama is not running: start the Ollama app (or `ollama serve`). Check `LLM_BASE_URL` if you changed the port. |
-| `Ollama is running but model 'x' is not installed` / `HTTP 404 ... check the model name` | `ollama list` shows the real names; run `ollama pull <name>` and make `LLM_MODEL` identical (including `:3b`). |
-| The first answer takes very long, later ones are faster | The model was loading into memory. The app warms it up at start; wait for the first answer once, or use a smaller model. Run `py main.py --benchmark`. |
-| `rejected the API key (HTTP 401)` | Wrong or missing `LLM_API_KEY`. Fix it in Settings or `.env`. |
-| Database error / `database is locked` / corrupted DB | Close all copies of the app. The database is `storage\mentor.db`; to start clean, close the app and rename that file (your old data stays in the renamed file). |
+| `Missing packages: customtkinter...` or `ModuleNotFoundError: No module named 'customtkinter'` (`numpy`, `requests`) | The environment is not active or dependencies are missing: activate `.venv`, then `pip install -r requirements.txt`. |
+| `No module named '_tkinter'` / `'tkinter'` | Re-run the Python installer > Modify > tick **tcl/tk and IDLE**. |
+| `Could not find a version that satisfies the requirement faiss-cpu` | Use Python 3.11/3.12, or remove the `faiss-cpu` line (NumPy fallback). |
+| `<Provider> API key is missing` | Settings > AI model: paste the key and Save (or set the environment variable). The message includes the page where you get a key. |
+| `... rejected the API key (HTTP 401)` | The key is wrong, revoked, or belongs to another provider. Paste it again. (Gemini reports a bad key as HTTP 400 "API key not valid".) |
+| `... returned 404 - check the model name` | The model id does not exist for your account. Use **Refresh models** or choose another model. |
+| `quota / billing limit reached (HTTP 429)` | Your account has no credit/quota. Check the provider's billing page. A plain rate limit (also 429) is retried automatically; wait and try again. |
+| `Cannot reach <Provider> ... check your internet connection, proxy or firewall` | No internet, or a firewall/proxy blocks the API host. Allow HTTPS to the provider's API address (shown in Settings > Base URL hint). |
+| `did not answer within 60s (timeout)` | Slow network or an overloaded model. Retry, choose a faster model, or raise `LLM_TIMEOUT`. |
+| Settings says keys are stored in `storage/settings.json (plain text)` | The optional `keyring` package is not installed: `pip install keyring`, restart, and save the key again - it moves to Windows Credential Manager. |
+| Database error / `database is locked` | Close all copies of the app. To start clean, close the app and rename `storage\mentor.db` (your old data stays in the renamed file). |
 | App window does not open / no output | Run it from PowerShell (not by double-click) to see the error. Check `storage\app.log`. |
-| "Port" problems | Not applicable: the application is a desktop program and opens no web server. Only Ollama uses a port (11434). |
+| "Port" problems | Not applicable: this is a desktop program and opens no web server. (Only the optional local Ollama uses port 11434.) |
+| A learning link does not open | The link is opened in your default browser; if none can be started the address is copied to the clipboard and shown. Run `py main.py --check-links` to find dead links. |
+
+---
+
+## API key setup guide
+
+Each provider has its **own** key and its **own** API format; the app speaks each provider's official API. Keys are separate per
+provider - you can store several and switch in Settings. Pricing, free tiers and available models change; check the provider's
+page. The links below are the key-management pages as known at development time and are not verified from the build environment.
+
+| Provider (Settings name) | Get a key | Default model | Models listed in Settings |
+|---|---|---|---|
+| OpenAI (ChatGPT) | <https://platform.openai.com/api-keys> (create a secret key; the API needs billing credit) | `gpt-4o-mini` | gpt-4o-mini, gpt-4.1-mini, gpt-4.1, gpt-4o, gpt-5-mini, gpt-5 |
+| Anthropic (Claude) | <https://console.anthropic.com/settings/keys> | `claude-sonnet-5-5` | claude-haiku-5-5, claude-sonnet-5-5, claude-opus-5-5 |
+| Google (Gemini) | <https://aistudio.google.com/app/apikey> (Google AI Studio; a free tier may be available) | `gemini-2.5-flash` | gemini-2.5-flash, -flash-lite, -pro, gemini-2.0-flash |
+| Perplexity AI | <https://www.perplexity.ai/settings/api> (API tab; needs credit) | `sonar` | sonar, sonar-pro, sonar-reasoning-pro |
+| Z.ai (GLM) | <https://z.ai/manage-apikey/apikey-list> | `glm-4.5-air` | glm-4.5-air, glm-4.5, glm-4.5-flash, glm-4.6 |
+
+Steps for any provider: create an account > create an API key > copy it (it is shown once) > in the app **Settings > AI model**:
+select the provider > paste the key > **Save** > check that **Connection: OK** appears. The model list is a starting point: use
+**Refresh models** (OpenAI, Anthropic, Gemini, Ollama list your account's real models) or type any model id.
+
+Speed tips for the ~5 s target: choose a fast model (`gpt-4o-mini`, `claude-haiku-5-5`, `gemini-2.5-flash`, `glm-4.5-air`); answers
+stream, so the first words appear as soon as the provider sends them. Perplexity's Sonar models are search-oriented; the app
+asks them not to search, but they are not the fastest choice for a mentor.
+
+### Optional: local Ollama (only if you select it)
+Not needed and never used automatically - if a cloud API fails you see the error, the app does **not** switch to Ollama. To use it:
+install from <https://ollama.com/download/windows>, run `ollama pull llama3.2:3b`, then in Settings choose **Ollama (local,
+optional)** and the model, and press **Save**. (`py main.py --benchmark` measures its speed.)
 
 ---
 
 ## Other commands
 ```powershell
-py -m pytest -q                 # run the automated tests (40 tests, fake LLM, no GPU needed)
-py main.py --benchmark          # measure time-to-first-token / tokens per second of YOUR model
+py -m pytest -q                 # automated tests (GUI tests need a display and are skipped without one)
+py main.py --check-providers    # validate every provider that has a key + time a streamed answer
+py main.py --benchmark          # time-to-first-token / tokens per second of the selected provider
 py main.py --check-links        # check that every curated learning link still opens (needs internet)
 ```
 
 ## What the application does (short)
 * Create a project from an idea -> personalised roadmap -> guided **one task at a time**.
-* Understands what the student means (task questions, "next", "I understand", libraries, errors, any task or the
-  whole roadmap) using the real project state; progress changes **only** after a successful validation.
+* Understands what the student means (task questions, "next", "I understand", libraries, errors, any task or the whole roadmap)
+  using the real project state; progress changes **only** after a successful validation.
+* **Language is automatic:** every message is analysed; the reply mirrors its language, script and style (English, Tamil,
+  Tanglish, Hindi, Telugu, Malayalam, Kannada, romanised forms, mixed text).
 * Students submit files/ZIPs or written answers -> hybrid validation (rule checks + static analysis + AI review).
-* Learning Resources with **official, curated links** for every recommended technology.
-* Answers stream in progressively; language follows each message automatically.
-* Strict no-code policy (prompt + independent response guard) and project-only scope.
+* **Learning Resources:** official documentation plus "Start with" tutorials for the technologies the project needs
+  (109 catalogued), tied to task numbers, with **clickable** titles.
+* Answers stream in progressively; strict no-code policy (prompt + independent response guard) and project-only scope.
 
 See [docs/PROJECT_DOCUMENTATION.md](docs/PROJECT_DOCUMENTATION.md) for details and
 [Known limitations](docs/PROJECT_DOCUMENTATION.md#21-limitations).

@@ -1,0 +1,9 @@
+{
+  "THEME": "light",
+  "LLM_PROVIDER": "anthropic",
+  "LLM_MODEL": "claude-sonnet-5-5",
+  "LLM_BASE_URL": "",
+  "LLM_API_KEY": "legacy-plaintext-key-0000",
+  "EMBEDDING_BACKEND": "hash",
+  "CODE_EXECUTION": "off"
+}

@@ -77,7 +77,8 @@ class ResourcesView(ctk.CTkFrame):
 
     def _open(self, index: int) -> None:
         n = self.notes[index]
-        doc = f"\n\n**Official documentation:** {n['doc_url']}" if n["doc_url"] and n["doc_url"] not in n["content_md"] else ""
+        doc = (f"\n\nOfficial Documentation – [{n['tool_name']} documentation]({n['doc_url']})"
+               if n["doc_url"] and n["doc_url"] not in n["content_md"] else "")
         self._show(f"# {n['tool_name']}  ({n['language']})\n\n{n['content_md']}{doc}")
 
     def _show(self, text: str) -> None:

@@ -22,7 +22,7 @@ from pathlib import Path
 
 from ai_engine import intent_router, prompts
 from ai_engine.conversation_memory import build_history
-from ai_engine.language_detector import LangInfo, detect, reply_language_instruction
+from ai_engine.language_detector import LangInfo, detect, reply_language_instruction, resolve
 from ai_engine.llm_provider import LLMError, get_provider
 from ai_engine.response_guard import StreamGuard
 from ai_engine.response_guard import check as guard_check
@@ -105,9 +105,10 @@ class Mentor:
     # ---- language -----------------------------------------------------------------------------------------------
     @staticmethod
     def language_rule(text: str, user: dict, fallback_lang: str = "") -> tuple[str, LangInfo]:
-        """Language is decided per message (never from a setting). `user` is kept for API compatibility."""
-        info = detect(text) if text.strip() else LangInfo(fallback_lang or "unknown", "unknown", False)
+        """Language is decided per message (never from a setting). `user` is kept for API compatibility.
+        Tiny follow-ups ('ok', 'next task') keep the language of the conversation; a clear switch is followed at once."""
         recent = "" if (not fallback_lang or fallback_lang.lower().startswith(("english", "unknown"))) else fallback_lang
+        info = resolve(text, recent) if text.strip() else LangInfo(fallback_lang or "unknown", "unknown", False)
         return reply_language_instruction(info, "", recent), info
 
     @staticmethod
@@ -272,7 +273,7 @@ class Mentor:
         repo.add_message(conversation_id, "user", text or "(files attached)", metadata=meta)
         if meta["mode"] == "submit":
             return self._submission(conversation_id, project, user, text, paths, rule, say)
-        return self._question(conversation_id, project, user, text, rule, say, on_token, cancel)
+        return self._question(conversation_id, project, user, text, rule, say, on_token, cancel, info.reply_name)
 
     # ---- project state helpers --------------------------------------------------------------------------------------
     @staticmethod
@@ -328,18 +329,8 @@ class Mentor:
 
     @staticmethod
     def _links_block(names: list[str], limit: int = 8) -> str:
-        """Verified official sources only (curated catalog). Empty when nothing is known - never a guessed URL."""
-        lines, seen = [], set()
-        for n in names:
-            for e in resource_manager.find_entries(n):
-                if e.key in seen:
-                    continue
-                seen.add(e.key)
-                lines.append(f"- **{e.name}** - official documentation, {e.official[0]}: {e.official[1]}")
-                lines += [f"  Learn: {t} - {s}: {u}" for t, u, s in e.links[:2] if u != e.official[1]]
-                if len(seen) >= limit:
-                    break
-        return ("\n\n**Learning resources (official sources)**\n" + "\n".join(lines)) if lines else ""
+        """Verified official sources only (curated catalog, clickable titles). '' when nothing is known - never a guess."""
+        return resource_manager.links_block(names, limit)
 
     def _tool_lines(self, tools: list[dict], tasks: list[dict]) -> str:
         out = []
@@ -487,7 +478,7 @@ class Mentor:
         return Plan(how, self._block(active) if active else "(none)", MAX_TOKENS.get(kind, 600), extra, "")
 
     # ---- normal questions -------------------------------------------------------------------------------------------
-    def _question(self, cid, project, user, text, rule, say, on_token, cancel=None) -> list[dict]:
+    def _question(self, cid, project, user, text, rule, say, on_token, cancel=None, lang_name: str = "") -> list[dict]:
         t0 = time.perf_counter()
         pid = project["id"]
         tasks, tools = repo.list_tasks(pid), repo.list_requirements(pid, "tool")
@@ -496,8 +487,9 @@ class Mentor:
         meta = {"intent": it.kind}
 
         if it.project_related is False:                       # genuinely unrelated: no LLM call at all
-            on_token(prompts.OFF_TOPIC_REPLY)
-            return [repo.add_message(cid, "assistant", prompts.OFF_TOPIC_REPLY, metadata={**meta, "timings": tm})]
+            reply = prompts.off_topic_reply(lang_name)            # fixed text, in the student's language
+            on_token(reply)
+            return [repo.add_message(cid, "assistant", reply, metadata={**meta, "timings": tm})]
 
         plan = self._plan(it, project, tasks, tools, cid)
         active = next((t for t in tasks if t["status"] == "active"), None)
@@ -529,6 +521,7 @@ class Mentor:
                 raise LLMError("The model returned an empty answer.")
             if off:
                 meta["intent"] = "unrelated"
+                final = prompts.off_topic_reply(lang_name)
             elif plan.append:
                 on_token(plan.append)
                 final += plan.append

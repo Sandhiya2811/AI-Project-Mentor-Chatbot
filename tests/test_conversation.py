@@ -226,7 +226,8 @@ def test_after_validation_moving_on_explains_task_2(env):
 def test_unrelated_questions_get_the_fixed_reply_without_calling_the_llm(env, msg):
     pid, cid = make_project()
     reply, sent = ask(env, cid, msg)
-    assert reply["content"] == prompts.OFF_TOPIC_REPLY and sent is None
+    expected = prompts.off_topic_reply(detect(msg).reply_name)          # same fixed text, in the student's language
+    assert reply["content"] == expected and sent is None
 
 
 def test_unsure_messages_let_the_llm_decide_but_never_force_a_refusal(env):

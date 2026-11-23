@@ -91,7 +91,13 @@ UNRELATED = {
     "marriage", "wedding", "diet", "workout", "gym", "travel", "hotel", "flight", "tourist", "shopping", "fashion",
     "movie", "padam", "paatu", "saapadu", "mazhai", "kadhal", "vaanilai", "capital", "population", "poem", "story",
     "bitcoin", "stocks", "horror", "game", "games", "gaming", "memes", "meme", "religion", "god", "birthday", "festival",
-    "நடிகர்", "படம்", "பாட்டு", "மழை", "கிரிக்கெட்", "சாப்பாடு",
+    "நடிகர்", "படம்", "பாட்டு", "மழை", "கிரிக்கெட்", "சாப்பாடு", "வானிலை", "சினிமா", "சமையல்", "நகைச்சுவை",
+    # Hindi, Malayalam, Telugu, Kannada (script) and their romanised forms
+    "मौसम", "क्रिकेट", "फिल्म", "फ़िल्म", "गाना", "गाने", "खाना", "रेसिपी", "चुटकुला", "राशिफल", "चुनाव",
+    "കാലാവസ്ഥ", "സിനിമ", "പാട്ട്", "ക്രിക്കറ്റ്", "പാചകം", "തമാശ",
+    "వాతావరణం", "సినిమా", "పాట", "క్రికెట్", "వంట", "జోక్",
+    "ಹವಾಮಾನ", "ಸಿನಿಮಾ", "ಹಾಡು", "ಕ್ರಿಕೆಟ್", "ಅಡುಗೆ",
+    "mausam", "mazha", "kaalavastha", "vathavaranam", "havamana", "chitti", "gaana",
 }
 STOP = {"this", "that", "with", "from", "your", "have", "will", "would", "could", "should", "about", "into", "which",
         "their", "there", "where", "what", "when", "then", "than", "them", "they", "these", "those", "been", "being",

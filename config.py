@@ -46,12 +46,12 @@ def _load_dotenv(path: Path) -> None:
 _load_dotenv(ENV_PATH)
 
 DEFAULTS = {
-    "LLM_PROVIDER": "ollama",  # ollama | openai | anthropic | openai_compatible
+    "LLM_PROVIDER": "openai",  # openai | anthropic | google | perplexity | zai | ollama (optional, local) | openai_compatible
     "LLM_MODEL": "",
     "LLM_BASE_URL": "",
     "LLM_API_KEY": "",
     "LLM_TEMPERATURE": "0.4",
-    "LLM_TIMEOUT": "180",
+    "LLM_TIMEOUT": "",  # seconds to wait for a reply; empty = provider default (cloud 60, openai_compatible 120, Ollama 180)
     "EMBEDDING_BACKEND": "hash",  # hash | sentence-transformers | ollama
     "EMBEDDING_MODEL": "",
     "THEME": "dark",  # dark | light | system
@@ -63,13 +63,44 @@ DEFAULTS = {
     "AUTO_AI_NOTES": "idle",  # idle = write AI learning notes in the background only while you are not chatting | off
 }
 
-PROVIDER_DEFAULTS = {
-    "ollama": {"model": "llama3.1", "base_url": "http://localhost:11434"},
-    "openai": {"model": "gpt-4o-mini", "base_url": "https://api.openai.com/v1"},
-    "anthropic": {"model": "claude-sonnet-5-5", "base_url": "https://api.anthropic.com"},
-    "openai_compatible": {"model": "", "base_url": "http://localhost:1234/v1"},
+# One entry per provider. To add a provider: add it here and register its class in ai_engine/llm_provider.PROVIDERS.
+PROVIDER_INFO = {
+    "openai": {
+        "label": "OpenAI (ChatGPT)", "cloud": True, "needs_key": True, "model": "gpt-4o-mini",
+        "base_url": "https://api.openai.com/v1", "env": ["OPENAI_API_KEY"], "timeout": 60,
+        "key_url": "https://platform.openai.com/api-keys",
+        "models": ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1", "gpt-4o", "gpt-5-mini", "gpt-5"]},
+    "anthropic": {
+        "label": "Anthropic (Claude)", "cloud": True, "needs_key": True, "model": "claude-sonnet-5-5",
+        "base_url": "https://api.anthropic.com", "env": ["ANTHROPIC_API_KEY"], "timeout": 60,
+        "key_url": "https://console.anthropic.com/settings/keys",
+        "models": ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"]},
+    "google": {
+        "label": "Google (Gemini)", "cloud": True, "needs_key": True, "model": "gemini-2.5-flash",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta", "env": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+        "timeout": 60, "key_url": "https://aistudio.google.com/app/apikey",
+        "models": ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro", "gemini-2.0-flash"]},
+    "perplexity": {
+        "label": "Perplexity AI", "cloud": True, "needs_key": True, "model": "sonar",
+        "base_url": "https://api.perplexity.ai", "env": ["PERPLEXITY_API_KEY", "PPLX_API_KEY"], "timeout": 60,
+        "key_url": "https://www.perplexity.ai/settings/api",
+        "models": ["sonar", "sonar-pro", "sonar-reasoning-pro"]},
+    "zai": {
+        "label": "Z.ai (GLM)", "cloud": True, "needs_key": True, "model": "glm-4.5-air",
+        "base_url": "https://api.z.ai/api/paas/v4", "env": ["ZAI_API_KEY", "ZHIPUAI_API_KEY"], "timeout": 60,
+        "key_url": "https://z.ai/manage-apikey/apikey-list",
+        "models": ["glm-4.5-air", "glm-4.5", "glm-4.5-flash", "glm-4.6"]},
+    "ollama": {
+        "label": "Ollama (local, optional)", "cloud": False, "needs_key": False, "model": "llama3.1",
+        "base_url": "http://localhost:11434", "env": [], "timeout": 180, "key_url": "",
+        "models": ["llama3.2:3b", "llama3.1", "qwen2.5:7b"]},
+    "openai_compatible": {
+        "label": "OpenAI-compatible (custom server)", "cloud": False, "needs_key": False, "model": "",
+        "base_url": "http://localhost:1234/v1", "env": [], "timeout": 120, "key_url": "", "models": []},
 }
-PROVIDER_KEY_ENV = {"openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
+# Backwards-compatible views of the registry (older code and tests import these names).
+PROVIDER_DEFAULTS = {k: {"model": v["model"], "base_url": v["base_url"]} for k, v in PROVIDER_INFO.items()}
+PROVIDER_KEY_ENV = {k: v["env"][0] for k, v in PROVIDER_INFO.items() if v["env"]}
 
 
 class Settings:
@@ -92,22 +123,55 @@ class Settings:
             return os.environ[key]
         return DEFAULTS.get(key, "")
 
+    # ---- per-provider values --------------------------------------------------------------------
+    @property
+    def active_provider(self) -> str:
+        return self.get("LLM_PROVIDER") or "openai"
+
+    def model_for(self, provider: str) -> str:
+        """Saved model of `provider`. The legacy single LLM_MODEL belongs to the provider that is currently active."""
+        saved = self._overrides.get(f"MODEL_{provider.upper()}", "")
+        if not saved and provider == self.active_provider:
+            saved = self.get("LLM_MODEL")
+        return saved or PROVIDER_INFO.get(provider, {}).get("model", "")
+
+    def base_url_for(self, provider: str) -> str:
+        saved = self._overrides.get(f"BASE_URL_{provider.upper()}", "")
+        if not saved and provider == self.active_provider:
+            saved = self.get("LLM_BASE_URL")
+        return (saved or PROVIDER_INFO.get(provider, {}).get("base_url", "")).rstrip("/")
+
+    def api_key_for(self, provider: str) -> str:
+        from utils import secrets   # local import: secrets reads this module
+        return secrets.get_key(provider)
+
+    def timeout_for(self, provider: str) -> float:
+        raw = self.get("LLM_TIMEOUT")
+        try:
+            return float(raw) if raw else float(PROVIDER_INFO.get(provider, {}).get("timeout", 120))
+        except ValueError:
+            return float(PROVIDER_INFO.get(provider, {}).get("timeout", 120))
+
     def provider_value(self, what: str) -> str:
-        """Resolve model / base_url / api_key for the active provider."""
-        provider = self.get("LLM_PROVIDER")
-        if what == "model":
-            return self.get("LLM_MODEL") or PROVIDER_DEFAULTS.get(provider, {}).get("model", "")
-        if what == "base_url":
-            return (self.get("LLM_BASE_URL") or PROVIDER_DEFAULTS.get(provider, {}).get("base_url", "")).rstrip("/")
-        if what == "api_key":
-            return self.get("LLM_API_KEY") or os.environ.get(PROVIDER_KEY_ENV.get(provider, ""), "")
-        return ""
+        """Resolve model / base_url / api_key for the ACTIVE provider (kept for existing callers)."""
+        p = self.active_provider
+        return {"model": self.model_for, "base_url": self.base_url_for, "api_key": self.api_key_for}.get(what, lambda _p: "")(p)
+
+    def remove(self, keys: list[str]) -> None:
+        changed = False
+        for k in keys:
+            changed |= self._overrides.pop(k, None) is not None
+        if changed:
+            self._write()
 
     def update(self, values: dict[str, str]) -> None:
         self._overrides.update({k: str(v) for k, v in values.items()})
+        self._write()
+
+    def _write(self) -> None:
         STORAGE_DIR.mkdir(parents=True, exist_ok=True)
         SETTINGS_PATH.write_text(json.dumps(self._overrides, indent=2), encoding="utf-8")
-        try:  # may contain an API key -> owner-only where the OS supports it
+        try:  # may contain a fallback-stored API key -> owner-only where the OS supports it
             os.chmod(SETTINGS_PATH, 0o600)
         except OSError:
             pass

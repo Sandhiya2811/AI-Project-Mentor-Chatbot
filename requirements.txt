@@ -2,11 +2,12 @@
 customtkinter>=5.2.2
 requests>=2.31
 numpy>=1.24
-faiss-cpu>=1.7.4          # vector search for the RAG knowledge base (numpy fallback is used if missing)
+faiss-cpu>=1.7.4          # vector search for the RAG knowledge base (a slower NumPy fallback is used if it cannot be installed)
 
-# --- recommended (static analysis / testing of Python submissions) ---
-ruff>=0.5
-pytest>=8.0
+# --- recommended ---
+keyring>=24               # stores API keys in Windows Credential Manager / macOS Keychain instead of a plain file
+ruff>=0.5                 # Python lint during code review
+pytest>=8.0               # run the automated tests
 
 # --- optional ---
 pypdf>=4.0                # read PDF submissions / PDF knowledge documents

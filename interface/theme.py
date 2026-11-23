@@ -13,7 +13,7 @@ PALETTE = {
     "accent": ("#10a37f", "#10a37f"), "accent_hover": ("#0d8c6d", "#0d8c6d"),
     "border": ("#d9d9dc", "#3a3a3a"), "hover": ("#e4e4e7", "#2f2f2f"), "selected": ("#e0e0e4", "#343434"),
     "ok": ("#13795b", "#4cd9a6"), "bad": ("#c62828", "#ff7b72"), "warn": ("#a35f00", "#f0b429"),
-    "code_bg": ("#e8e8ec", "#161616"), "danger": ("#d64545", "#d64545"), "danger_hover": ("#b83838", "#b83838"),
+    "code_bg": ("#e8e8ec", "#161616"), "danger": ("#d64545", "#d64545"), "link": ("#0b57d0", "#7ab7ff"), "danger_hover": ("#b83838", "#b83838"),
 }
 
 FAMILY = "Segoe UI" if sys.platform == "win32" else ("Helvetica Neue" if sys.platform == "darwin" else "DejaVu Sans")

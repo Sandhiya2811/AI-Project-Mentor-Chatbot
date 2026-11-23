@@ -25,14 +25,54 @@ TANGLISH = {"enakku", "puriyala", "puriyudhu", "purila", "puriyuthu", "pannunga"
 HINGLISH = {"mujhe", "kaise", "samajh", "samjhao", "nahi", "nahin", "karna", "kya", "batao", "bataiye", "hai", "hain",
             "mera", "meri", "karo", "kijiye", "chahiye", "aap", "tum", "kaun", "kyun", "kyu", "accha", "theek", "abhi",
             "wala", "wali", "bhai", "yaar", "agla", "pichla", "kaam"}
-TELUGLISH = {"naaku", "ardham", "ayyindi", "cheppu", "cheppandi", "ela", "enti", "kavali", "ledu", "undi", "chesanu"}
-MALAYALISH = {"enikku", "manasilayilla", "parayu", "engane", "entha", "venam", "illa", "cheyyam", "athu"}
-KANNADIGLISH = {"nanage", "artha", "gottilla", "heli", "hege", "enu", "beku", "illa", "madi"}
+TANGLISH |= {"enaku", "namma", "nama", "nammaku", "pannuvom", "panlam", "pannitu", "pannitten", "panniten", "pannunga", "irukka",
+             "irukkum", "idhu", "idhula", "adhu", "adhula", "ithu", "athu", "enga", "yaaru", "yeppadi", "eppo", "epo", "ippadi",
+             "appadi", "thaan", "dhaan", "than", "naa", "naama", "avanga", "ungaluku", "unakku", "vandhu", "poi", "paaru",
+             "paarkalam", "seiyalam", "seyyalam", "seiyanum", "venuma", "vendama", "puriyum", "puriyuthu", "purinjidhu",
+             "purinjathu", "purinjiduchu", "theliva", "theliva", "thelivaa", "sollunga", "sollitharen", "solren", "mudinjuthu",
+             "mudinjidhu", "mudichiduchu", "mudinchuchu", "irundha", "iruntha", "aana", "aanaa", "illaina", "adhan", "edhukku"}
+HINGLISH |= {"mujhe", "mereko", "samjha", "samajhna", "banana", "banao", "karte", "karenge", "karni", "hoga", "hogi", "kaisa",
+             "kaisi", "kitna", "kahan", "kab", "sabse", "pehle", "phir", "uske", "iska", "isme", "usme", "lekin", "aur", "toh",
+             "chahta", "chahti", "dekho", "dikhao", "bolo", "samajh", "aaya", "gaya", "wahi", "sirf", "bilkul", "zaroor"}
+TELUGLISH = {"naaku", "naku", "ardham", "ardhamayyindi", "ayyindi", "cheppu", "cheppandi", "ela", "enti", "emiti", "kavali",
+             "kaavali", "ledu", "undi", "chesanu", "cheyali", "cheyyali", "cheddam", "chestanu", "mana", "meeru", "nenu", "idi",
+             "adi", "ikkada", "akkada", "tarvata", "taruvata", "modati", "modata", "telusu", "teliyadu", "avunu", "ante", "kani",
+             "vachindi", "ravatledu", "cheyochu", "ekkada", "enduku", "yela", "baagundi"}
+MALAYALISH = {"enikku", "enik", "manasilayilla", "manassilaayilla", "manasilayi", "parayu", "parayoo", "engane", "entha",
+              "enthaanu", "venam", "venamo", "illa", "cheyyam", "cheyyanam", "cheyyaam", "athu", "ithu", "njan", "njaan",
+              "ningal", "nammal", "nammude", "aanu", "alle", "aano", "ariyilla", "ariyam", "sheri", "shari", "kollam", "pinne",
+              "ippo", "ippol", "pattum", "pattilla", "undu", "ondu", "ente", "ningalude", "enthu", "evide", "ennal"}
+KANNADIGLISH = {"nanage", "nange", "artha", "gottilla", "gotthilla", "heli", "helu", "hege", "enu", "beku", "illa", "madi",
+                "maadi", "maadona", "madona", "namma", "nimma", "nanu", "naanu", "idu", "adu", "alli", "illi", "yaake", "yavaga",
+                "sari", "chennagide", "gottu", "aagide", "aaytu", "maadbeku", "madbeku", "ide"}
 LATIN_VARIANTS = [("Tanglish", "Latin (Tamil written in English letters)", TANGLISH),
                   ("Hinglish", "Latin (Hindi written in English letters)", HINGLISH),
-                  ("Telugu (romanised)", "Latin (Telugu written in English letters)", TELUGLISH),
-                  ("Malayalam (romanised)", "Latin (Malayalam written in English letters)", MALAYALISH),
-                  ("Kannada (romanised)", "Latin (Kannada written in English letters)", KANNADIGLISH)]
+                  ("Tenglish", "Latin (Telugu written in English letters)", TELUGLISH),
+                  ("Manglish", "Latin (Malayalam written in English letters)", MALAYALISH),
+                  ("Kanglish", "Latin (Kannada written in English letters)", KANNADIGLISH)]
+
+# How the reply must LOOK for each language: script and register matter, not only the language name.
+STYLE = {
+    "Tanglish": "Write in Tanglish: Tamil in English (Latin) letters, naturally mixed with English technical words, the way a "
+                "Tamil friend would type. Example: 'Super! Ippo namma Task 2 ku move pannalam.' Do NOT use Tamil script.",
+    "Tamil": "Write in Tamil script (தமிழ்) in simple spoken-style Tamil, keeping programming terms in English letters. "
+             "Example: 'சூப்பர்! முதலில் project-ன் நோக்கத்தையும் planning-ஐயும் புரிந்துகொள்வோம்.'",
+    "Hinglish": "Write in Hinglish: Hindi in English (Latin) letters mixed with English technical words. Example: 'Bilkul! "
+                "Sabse pehle hum project ka objective samjhenge.' Do NOT use Devanagari.",
+    "Hindi": "Write in Hindi using Devanagari, keeping programming terms in English. Example: 'बिल्कुल! सबसे पहले हम "
+             "प्रोजेक्ट का उद्देश्य और उसकी योजना समझेंगे।'",
+    "Manglish": "Write in Manglish: Malayalam in English (Latin) letters mixed with English technical words. Example: "
+                "'Sheri! Aadyam nammal project-inte objective manassilaakkaam.' Do NOT use Malayalam script.",
+    "Malayalam": "Write in Malayalam script, keeping programming terms in English. Example: 'തീർച്ചയായും! ആദ്യം "
+                 "നമുക്ക് പ്രോജക്റ്റിന്റെ ലക്ഷ്യവും പ്ലാനിംഗും മനസ്സിലാക്കാം.'",
+    "Tenglish": "Write in Tenglish: Telugu in English (Latin) letters mixed with English technical words. Example: 'Sare! "
+                "Mundu manam project objective ni ardham chesukundam.' Do NOT use Telugu script.",
+    "Telugu": "Write in Telugu script, keeping programming terms in English. Example: 'తప్పకుండా! ముందుగా మనం ప్రాజెక్ట్ "
+              "లక్ష్యాన్ని, ప్లానింగ్‌ను అర్థం చేసుకుందాం.'",
+    "Kanglish": "Write in Kanglish: Kannada in English (Latin) letters mixed with English technical words. Example: 'Sari! "
+                "Modalu namma project objective artha madkolona.' Do NOT use Kannada script.",
+    "Kannada": "Write in Kannada script, keeping programming terms in English.",
+}
 
 _NAMES = ("tamil|hindi|telugu|malayalam|kannada|english|tanglish|hinglish|bengali|marathi|gujarati|punjabi|urdu|"
           "spanish|french|german|arabic|chinese|japanese|korean|russian|portuguese|italian")
@@ -52,6 +92,14 @@ class LangInfo:
     def hint(self) -> str:
         extra = " The message mixes English with that language." if self.mixed else ""
         return f"Detected: {self.name} (script: {self.script}).{extra}"
+
+    @property
+    def reply_name(self) -> str:
+        """The language the reply must be in: an explicit request wins over what the message looks like."""
+        return self.requested or self.name
+
+    def style(self) -> str:
+        return STYLE.get(self.reply_name, "")
 
 
 def _explicit_request(text: str) -> str:
@@ -96,14 +144,36 @@ def detect(text: str) -> LangInfo:
     return LangInfo("English or another Latin-script language", "Latin", False, requested)
 
 
+def _words(text: str) -> list[str]:
+    return re.findall(r"[^\W\d_]+", text)
+
+
+def resolve(text: str, recent: str = "") -> LangInfo:
+    """Language of THIS message, keeping the conversation's language for tiny follow-ups.
+
+    "ok", "next task", "why pandas?" carry too little information to prove the student switched language, so in an
+    ongoing Tamil/Tanglish/Hindi... conversation they keep that language. A clear sentence in another language switches.
+    """
+    info = detect(text)
+    plain = recent and not recent.lower().startswith(("english", "unknown"))
+    if plain and not info.requested and info.name.startswith(("English", "unknown")) and len(_words(text)) <= 3:
+        return LangInfo(recent, "inherited from the previous messages", True, "")
+    return info
+
+
 def reply_language_instruction(info: LangInfo, preferred: str = "", recent: str = "") -> str:
     """Rule for THIS reply. `preferred` is accepted for backwards compatibility and ignored: language is never a setting."""
-    rule = ("Reply in the language and style of the student's LATEST message (Tamil, Tanglish, Hindi, Telugu, Malayalam, "
-            "Kannada, English, mixed - whatever they wrote), switching immediately if they switch. Keep programming terms, "
-            "library names and error names in English. Explain in simple beginner-friendly words.")
+    rule = ("LANGUAGE: work out the language, script and register of the student's LATEST message (English, Tamil, Tanglish, "
+            "Hindi, Hinglish, Telugu, Malayalam, Kannada, Manglish, Tenglish, mixed, or any other language) and answer in "
+            "exactly that language and style, like a native speaker chatting - never a word-by-word translation. Understand "
+            "the MEANING first (informal spelling and code-mixing are normal). If they write mixed English + another language, "
+            "answer in the dominant language and keep the mix natural. If they switch language, switch immediately; if "
+            "their message is too short to tell, stay in the language of the previous messages. Keep programming terms, "
+            "library names and error names in English. Explain in simple, beginner-friendly words.")
     if info.requested:
         rule = (f"The student explicitly asked for {info.requested}: reply in {info.requested} (keep technical terms in "
                 f"English) until they ask for another language. ") + rule
     elif recent and info.name.startswith(("English", "unknown")):
-        rule += (f" If the latest message is too short to tell (e.g. 'ok'), continue in the language used just before: {recent}.")
-    return f"{rule} Hint (heuristic, may be wrong): {info.hint()}"
+        rule += f" Language used just before: {recent}."
+    style = info.style()
+    return f"{rule}{(' STYLE: ' + style) if style else ''} Hint (heuristic, may be wrong): {info.hint()}"

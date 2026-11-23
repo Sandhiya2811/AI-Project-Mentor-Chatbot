@@ -66,8 +66,9 @@ class HomeView(ctk.CTkFrame):
         self.idea.delete("1.0", "end")
         self.set_busy(False)
 
-    def set_banner(self, text: str) -> None:
-        self.banner.configure(text=strip_non_bmp(text))
+    def set_banner(self, text: str, ok: bool = False) -> None:
+        """Status line at the bottom of the home screen: green = AI connected, amber = problem."""
+        self.banner.configure(text=strip_non_bmp(text), text_color=theme.color("ok" if ok else "warn"))
 
 
 class ProjectsView(ctk.CTkFrame):

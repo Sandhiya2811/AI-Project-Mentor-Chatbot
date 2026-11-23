@@ -3,6 +3,7 @@
     py main.py                 start the desktop application
     py main.py --benchmark     measure YOUR model: time to first token, tokens/second, model-load time
     py main.py --check-links   check every curated learning-resource URL (needs internet)
+    py main.py --check-providers   test every cloud provider that has an API key configured (real network calls)
 """
 from __future__ import annotations
 
@@ -74,6 +75,36 @@ def benchmark() -> None:
         print(f"Cannot benchmark: {exc}")
 
 
+def check_providers() -> None:
+    """Validates each provider that has a key, then times a tiny streamed answer. Uses YOUR keys; keys are never printed."""
+    import time
+
+    from ai_engine.llm_provider import LLMError, build_provider
+    from config import PROVIDER_INFO, settings
+
+    for pid, info in PROVIDER_INFO.items():
+        if not info["cloud"]:
+            continue
+        key = settings.api_key_for(pid)
+        print(f"\n{info['label']}  (model {settings.model_for(pid)})")
+        if not key:
+            print(f"  no API key configured - get one at {info['key_url']}")
+            continue
+        prov = build_provider(pid)
+        ok, msg = prov.validate()
+        print(f"  key/model check : {'OK' if ok else 'FAILED'} - {msg}")
+        if not ok:
+            continue
+        try:
+            t0, text = time.perf_counter(), ""
+            for piece in prov.stream_chat([{"role": "user", "content": "Say hello in one short sentence."}], max_tokens=40):
+                text += piece
+            s = prov.last_stats
+            print(f"  streamed answer : first text after {s.get('ttft_s', 0):.2f}s, total {time.perf_counter() - t0:.2f}s -> {text.strip()[:60]!r}")
+        except LLMError as exc:
+            print(f"  streaming FAILED: {exc}")
+
+
 def check_links() -> None:
     """HEAD/GET every curated URL; prints the ones that do not answer with a success or redirect status."""
     import requests
@@ -110,8 +141,12 @@ def main() -> None:
         return benchmark()
     if "--check-links" in sys.argv:
         return check_links()
+    if "--check-providers" in sys.argv:
+        return check_providers()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
                         handlers=[logging.StreamHandler(), logging.FileHandler(STORAGE_DIR / "app.log", encoding="utf-8")])
+    from utils import secrets
+    secrets.install_log_redaction()                  # API keys can never appear in logs
     from database.db import init_db
     from ai_engine.llm_provider import quick_health
     from rag import knowledge_base

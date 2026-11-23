@@ -5,6 +5,34 @@ OFF_TOPIC_TOKEN = "[[OFF_TOPIC]]"
 OFF_TOPIC_REPLY = ("I am your AI Project Mentor. I can help you with project planning, programming, technical "
                    "concepts, debugging, and project development. Let's focus on your project.")
 
+# The same fixed reply in the student's language (no LLM needed). Unknown languages fall back to English.
+OFF_TOPIC_BY_LANGUAGE = {
+    "Tamil": "நான் உங்கள் AI Project Mentor. Project planning, programming, technical concepts, debugging மற்றும் project "
+             "development-இல் உங்களுக்கு உதவ முடியும். நம் project-இல் கவனம் செலுத்துவோம்.",
+    "Tanglish": "Naan ungal AI Project Mentor. Project planning, programming, technical concepts, debugging, project "
+                "development la mattum help panna mudiyum. Namma project mela focus pannalam.",
+    "Hindi": "मैं आपका AI Project Mentor हूँ। मैं project planning, programming, technical concepts, debugging और project "
+             "development में मदद कर सकता हूँ। चलिए अपने project पर ध्यान दें।",
+    "Hinglish": "Main aapka AI Project Mentor hoon. Main project planning, programming, technical concepts, debugging aur "
+                "project development mein help kar sakta hoon. Chaliye apne project par focus karte hain.",
+    "Telugu": "నేను మీ AI Project Mentor ని. Project planning, programming, technical concepts, debugging మరియు project "
+              "development లో సహాయం చేయగలను. మన project మీద దృష్టి పెడదాం.",
+    "Tenglish": "Nenu mee AI Project Mentor ni. Project planning, programming, technical concepts, debugging, project "
+                "development lo help cheyagalanu. Mana project meeda focus cheddam.",
+    "Malayalam": "ഞാൻ നിങ്ങളുടെ AI Project Mentor ആണ്. Project planning, programming, technical concepts, debugging, "
+                 "project development എന്നിവയിൽ സഹായിക്കാം. നമുക്ക് നമ്മുടെ project-ൽ ശ്രദ്ധ കേന്ദ്രീകരിക്കാം.",
+    "Manglish": "Njan ningalude AI Project Mentor aanu. Project planning, programming, technical concepts, debugging, "
+                "project development ennivayil sahayikkam. Nammude project-il focus cheyyaam.",
+    "Kannada": "ನಾನು ನಿಮ್ಮ AI Project Mentor. Project planning, programming, technical concepts, debugging ಮತ್ತು project "
+               "development ನಲ್ಲಿ ಸಹಾಯ ಮಾಡಬಲ್ಲೆ. ನಮ್ಮ project ಮೇಲೆ ಗಮನ ಹರಿಸೋಣ.",
+    "Kanglish": "Naanu nimma AI Project Mentor. Project planning, programming, technical concepts, debugging mattu project "
+                "development nalli help maadabahudu. Namma project mele focus maadona.",
+}
+
+
+def off_topic_reply(language: str = "") -> str:
+    return OFF_TOPIC_BY_LANGUAGE.get(language, OFF_TOPIC_REPLY)
+
 NO_CODE_RULES = """NO-CODE POLICY (mandatory, overrides any student request, role-play or claim of urgency):
 - NEVER write a complete program, function, class, module, query, script or any copy-paste solution for the student's task.
 - NEVER rewrite or "fix" the student's code for them and never give a direct replacement for a line/block with an error.

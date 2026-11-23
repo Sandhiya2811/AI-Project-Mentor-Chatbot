@@ -10,8 +10,8 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from ai_engine.assistant import Mentor
-from ai_engine.llm_provider import LLMError, get_provider, quick_health
-from config import APP_NAME, UPLOAD_DIR, settings
+from ai_engine.llm_provider import LLMError, build_provider, connection_status, get_provider, quick_health
+from config import APP_NAME, PROVIDER_INFO, UPLOAD_DIR, settings
 from database import repository as repo
 from interface import theme
 from interface.chat_view import ChatView
@@ -21,6 +21,7 @@ from interface.settings_view import ProfileDialog, RoadmapDialog, SettingsView
 from interface.sidebar import Sidebar
 from learning import notes_generator
 from rag import retriever
+from utils import secrets
 
 log = logging.getLogger(__name__)
 
@@ -59,7 +60,8 @@ class App(ctk.CTk):
             "chat": ChatView(self.host, self.send, self.show_home, self.show_roadmap),
             "projects": ProjectsView(self.host, self.resume_project, self.delete_project, self.show_resources),
             "resources": ResourcesView(self.host, lambda pid: self.show_resources(pid), self.regenerate_notes),
-            "settings": SettingsView(self.host, self.save_settings, self.test_connection, self.rebuild_index),
+            "settings": SettingsView(self.host, self.save_settings, self.test_connection, self.rebuild_index,
+                                     self.refresh_models, self.remove_key),
         }
         for v in self.views.values():
             v.grid(row=0, column=0, sticky="nsew")
@@ -67,7 +69,8 @@ class App(ctk.CTk):
         self.show_home()
         self.after(80, self._poll)
         self.run_bg(lambda: retriever.get_kb().ensure_index(), None)  # knowledge index in the background
-        self.run_bg(quick_health, self._health)
+        secrets.migrate_legacy()                       # old plain-text key -> OS keyring (only if a keyring exists)
+        self.run_bg(self._check_provider, self._health)
 
     # ---- background work -----------------------------------------------------------------------
     def run_bg(self, fn, on_ok=None, on_err=None) -> None:
@@ -97,12 +100,28 @@ class App(ctk.CTk):
         self.views["home"].set_busy(False)
         messagebox.showerror(APP_NAME, f"Something went wrong:\n{exc}")
 
+    @staticmethod
+    def _check_provider() -> tuple[bool, str]:
+        """Start-up / after-save check: config first (no network), then the provider's API (no tokens spent)."""
+        ok, msg = quick_health()
+        if not ok:
+            return ok, msg
+        ok, msg = connection_status()
+        if ok:
+            try:
+                get_provider().warm_up()           # Ollama only: load the model; cloud providers do nothing
+            except LLMError:
+                pass
+        return ok, msg
+
     def _health(self, result) -> None:
         ok, msg = result
-        self.views["home"].set_banner("" if ok else f"AI model not ready: {msg} (Settings > AI model). "
-                                                    "Non-AI features still work.")
-        if ok:  # load the model into memory now, so the first real question does not pay the loading time
-            self.run_bg(self._warm_up, None, lambda e: log.info("Model warm-up skipped: %s", e))
+        label = PROVIDER_INFO.get(settings.active_provider, {}).get("label", settings.active_provider)
+        self.views["home"].set_banner(f"AI connected: {label} - {settings.model_for(settings.active_provider)}" if ok else
+                                      f"AI model not ready: {msg}  (Settings > AI model). Non-AI features still work.", ok)
+        v = self.views["settings"]
+        if v.provider() == settings.active_provider:
+            v.set_connection(("Connection: OK - " if ok else "Connection problem - ") + msg, "ok" if ok else "bad")
 
     @staticmethod
     def _warm_up() -> None:
@@ -308,13 +327,25 @@ class App(ctk.CTk):
 
     def save_settings(self, values: dict) -> None:
         old_embed = (settings.get("EMBEDDING_BACKEND"), settings.get("EMBEDDING_MODEL"))
-        settings.update(values)
+        p = values["PROVIDER"]
+        P = p.upper()
+        model = values["MODEL"] or PROVIDER_INFO[p]["model"]
+        url = values["BASE_URL"]
+        settings.update({k: values[k] for k in ("THEME", "EMBEDDING_BACKEND", "EMBEDDING_MODEL", "CODE_EXECUTION")} | {
+            "LLM_PROVIDER": p, "LLM_MODEL": model, f"MODEL_{P}": model, "LLM_BASE_URL": url, f"BASE_URL_{P}": url})
         theme.apply_mode(values["THEME"])
         v = self.views["settings"]
-        v.set_status("Saved.")
+        msg = "Saved."
+        if values["API_KEY"]:
+            where = secrets.set_key(p, values["API_KEY"])       # never written to .env, logs or the database
+            msg += f" API key stored in: {where}."
+            v.key_var.set("")
+        v.refresh_key_info()
+        v.set_status(msg)
         if (values["EMBEDDING_BACKEND"], values["EMBEDDING_MODEL"]) != old_embed:
             self.rebuild_index()
-        self.run_bg(quick_health, self._health)
+        v.set_connection("Connection: checking...", "busy")
+        self.run_bg(self._check_provider, self._health)
         self.after(200, self._rerender)
 
     def _rerender(self) -> None:
@@ -323,12 +354,62 @@ class App(ctk.CTk):
             self.open_conversation(self.current_cid)
             self._show("settings")
 
-    def test_connection(self) -> None:
+    @staticmethod
+    def _provider_from_form(values: dict):
+        """A provider built from what is typed in the form (nothing is saved by testing)."""
+        p = values["PROVIDER"]
+        return build_provider(p, values["MODEL"] or settings.model_for(p), values["BASE_URL"] or PROVIDER_INFO[p]["base_url"],
+                              values["API_KEY"] or settings.api_key_for(p))
+
+    def test_connection(self, values: dict | None = None) -> None:
         v = self.views["settings"]
-        settings.update(v.values())
-        v.set_status("Testing connection...")
-        self.run_bg(lambda: get_provider().ping(), lambda m: v.set_status(m),
-                    lambda e: v.set_status(str(e) if isinstance(e, LLMError) else f"Error: {e}", ok=False))
+        values = values or v.values()
+        p = values["PROVIDER"]
+        v.set_connection("Connection: testing...", "busy")
+
+        def work():
+            prov = self._provider_from_form(values)
+            ok, msg = prov.validate()
+            models = []
+            if ok:
+                try:
+                    models = prov.list_models()
+                except LLMError:
+                    models = []
+            return ok, msg, models
+
+        def done(res):
+            ok, msg, models = res
+            v.set_connection(("Connection OK - " if ok else "Connection failed - ") + msg, "ok" if ok else "bad")
+            if models:
+                v.set_models(p, models)
+
+        self.run_bg(work, done, lambda e: v.set_connection(f"Connection failed - {secrets.redact(str(e))}", "bad"))
+
+    def refresh_models(self, values: dict | None = None) -> None:
+        v = self.views["settings"]
+        values = values or v.values()
+        p = values["PROVIDER"]
+        v.set_connection("Fetching the list of models...", "busy")
+
+        def done(models):
+            if models:
+                v.set_models(p, models)
+                v.set_connection(f"Connection OK - {len(models)} model(s) available for this account.", "ok")
+            else:
+                v.set_connection("This provider does not offer a model list - choose from the built-in list or type a model name.", "idle")
+
+        self.run_bg(lambda: self._provider_from_form(values).list_models(), done,
+                    lambda e: v.set_connection(f"Could not fetch models - {secrets.redact(str(e))}", "bad"))
+
+    def remove_key(self, provider: str) -> None:
+        if messagebox.askyesno(APP_NAME, f"Remove the saved API key for {PROVIDER_INFO[provider]['label']}?"):
+            secrets.delete_key(provider)
+            v = self.views["settings"]
+            v.refresh_key_info()
+            v.set_connection("Key removed.", "idle")
+            if provider == settings.active_provider:
+                self.run_bg(self._check_provider, self._health)
 
     def rebuild_index(self) -> None:
         v = self.views["settings"]

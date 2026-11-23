@@ -51,19 +51,33 @@ Saying "I finished" or "next" **never** completes a task. Only a successful revi
   conversations only (projects and submissions are kept).
 
 ## 5. Learning Resources
-Open **Learning Resources** (left menu), choose your project, and read the notes: a **Learning path** (what to learn, in
-which order, and which tasks need it) and one note per technology with official documentation and topic links. Notes marked
+Open **Learning Resources** (left menu), choose your project, and read the notes: a **Learning path** (what to learn, in which order,
+and which tasks need it) and one note per technology. The format is always:
+
+```
+1. Python  (needed for: Task 1, Task 6)
+Official Documentation - Python documentation
+Start with - The Python Tutorial
+Start with - Virtual environments and packages
+```
+Every title is a **link**: click it and the page opens in your browser (if the browser cannot be opened the address is copied for
+you). Only the technologies your project needs are shown, and "Start here" names the tools for your current task. Notes marked
 *(offline)* are ready instantly; AI-written notes in your language appear when you are idle, or press **Regenerate with AI**.
-Links are curated official sources; if no link is known the note tells you to search the official website - it never
-guesses one.
+If no link is known the note says so - the app never guesses a web address.
 
 ## 6. Settings and profile
-* **Settings:** theme, AI provider/model/URL/key, knowledge-base mode, code-execution mode, **Test AI connection**.
+* **Settings > AI model:** choose the AI **provider** (OpenAI ChatGPT, Anthropic Claude, Google Gemini, Perplexity, Z.ai GLM, or the
+  optional local Ollama), pick a **model**, paste your **API key**, press **Save**. The **Connection** line tells you whether the key
+  and model work. **Test connection** checks without saving; **Refresh models** lists the models your account can use. Each provider
+  remembers its own model and key; the key is kept in a secure store and shown only as `******1234`. Ask your teacher/admin for a key
+  or see the API key guide in `README.md`.
+* Other settings: theme, knowledge-base mode, code-execution mode.
 * **User Profile:** your name, skill level, and the language used for *learning notes* (chat language is automatic).
 
 ## 7. If something does not work
-* "AI model not ready" on the home screen: start Ollama / check the model name / key in Settings, then *Test AI connection*.
+* "AI model not ready" on the home screen: the message says why - a missing or rejected API key, a wrong model, no credit/quota, no
+  internet, or a timeout. Fix it in **Settings > AI model**, then **Test connection**. The app never switches to another provider on its own.
   Without the AI you can still read the roadmap, ask about tasks, next steps and libraries (answered from your saved roadmap),
   read the offline notes, and submit work for rule-based review.
-* Slow first answer: the model is loading; later answers are faster. Ask your teacher/admin to run `py main.py --benchmark`.
+* Slow answers: choose a faster model in Settings (for example `gpt-4o-mini`, `claude-haiku-5-5`, `gemini-2.5-flash`). Ask your teacher/admin to run `py main.py --check-providers`.
 * Windows setup problems: see the Troubleshooting table in `README.md`.

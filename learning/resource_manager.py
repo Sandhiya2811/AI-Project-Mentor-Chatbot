@@ -207,6 +207,45 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", _TOKEN.sub(" ", s.lower())).strip()
 
 
+def _merge_extra() -> None:
+    """Add the technologies in catalog_extra.py; for technologies that already exist only add links/aliases (no duplicates)."""
+    from learning import catalog_extra
+    for key, name, what, src, url, concepts, links, aliases in catalog_extra.ENTRIES:
+        full = [(l[0], l[1], l[2] if len(l) > 2 else src) for l in links]
+        if key in CATALOG:
+            _extend(key, full)
+            for a in aliases:
+                ALIAS.setdefault(_norm(a), key)
+        else:
+            _add(key, name, what, src, url, concepts, full, ())
+            for a in (key, name, *aliases):
+                ALIAS[_norm(a)] = key
+    for key, links in catalog_extra.ENRICH.items():
+        if key in CATALOG:
+            _extend(key, [(l[0], l[1], l[2] if len(l) > 2 else CATALOG[key].official[0]) for l in links])
+
+
+def _extend(key: str, links: list[tuple[str, str, str]]) -> None:
+    e = CATALOG[key]
+    have = {u for _t, u, _s in e.links} | {e.official[1]}
+    e.links += [l for l in links if l[1] not in have]
+
+
+def _dedupe_all() -> None:
+    """Data hygiene: no entry lists its official page or the same URL twice."""
+    for e in CATALOG.values():
+        seen, clean = {e.official[1]}, []
+        for t, u, src in e.links:
+            if u not in seen:
+                seen.add(u)
+                clean.append((t, u, src))
+        e.links = clean
+
+
+_merge_extra()
+_dedupe_all()
+
+
 def find_entry(tool: str) -> Entry | None:
     key = _norm(tool)
     if key in ALIAS:
@@ -237,16 +276,61 @@ def find_doc(tool: str) -> str:
     return es[0].official[1] if es else ""
 
 
-def links_markdown(tool: str) -> str:
+def _mdl(title: str, url: str) -> str:
+    """Markdown link; brackets in a title would break the syntax."""
+    return f"[{title.replace('[', '(').replace(']', ')')}]({url})"
+
+
+def entry_lines(e: Entry, seen: set[str], max_learn: int = 2) -> list[str]:
+    """The display format used everywhere (clickable titles, shown as links by the interface):
+
+        Official Documentation – [Python documentation](https://...)
+        Start with – [The Python Tutorial](https://...)
+
+    `seen` removes duplicates across a whole list (e.g. two tools that share a documentation page)."""
+    lines = []
+    if e.official[1] not in seen:
+        seen.add(e.official[1])
+        lines.append(f"Official Documentation – {_mdl(e.official[0], e.official[1])}")
+    n = 0
+    for title, url, src in e.links:
+        if url in seen:
+            continue
+        seen.add(url)
+        lines.append(f"Start with – {_mdl(title, url)}" + (f"  ({src})" if src != e.official[0] else ""))
+        n += 1
+        if n >= max_learn:
+            break
+    return lines
+
+
+def links_markdown(tool: str, seen: set[str] | None = None, max_learn: int = 4) -> str:
+    seen = set() if seen is None else seen
     es = find_entries(tool)
     if not es:
         return (f"No curated link is stored for {tool}. Search for the official documentation site of {tool} "
                 "(do not rely on unofficial copies).")
-    lines = []
+    lines: list[str] = []
     for e in es:
-        lines.append(f"{e.name} - official documentation, {e.official[0]}: {e.official[1]}")
-        lines += [f"{t} - {s}: {u}" for t, u, s in e.links if u != e.official[1]]
-    return "\n".join(f"- {x}" for x in lines)
+        lines += entry_lines(e, seen, max_learn)
+    return "\n".join(lines) or "Same resources as listed above."
+
+
+def links_block(names: list[str], limit: int = 8) -> str:
+    """'Learning resources' block for chat answers about tools/libraries (verified catalog only; '' when nothing is known)."""
+    seen: set[str] = set()
+    out, shown = [], set()
+    for n in names:
+        for e in find_entries(n):
+            if e.key in shown:
+                continue
+            shown.add(e.key)
+            lines = entry_lines(e, seen, 2)
+            if lines:
+                out += [f"**{e.name}**"] + lines
+            if len(shown) >= limit:
+                break
+    return ("\n\n**Learning resources (official sources)**\n" + "\n".join(out)) if out else ""
 
 
 def tasks_using(tool: str, tasks: list[dict]) -> list[dict]:
@@ -306,17 +390,23 @@ def offline_note(tool: str, role: str, doc_url: str, project: dict, position: in
 
 
 def learning_path(project: dict, tools: list[dict], tasks: list[dict]) -> str:
-    """Ordered reading list that ties every technology to the roadmap tasks that need it."""
+    """Ordered reading list that ties every technology to the roadmap tasks that need it (only THIS project's tools)."""
     lines = [f"# Learning path - {project['title']}", "Read in this order. Each item lists the tasks that need it.", ""]
+    active = next((t for t in tasks if t["status"] == "active"), None)
+    if active and active.get("tools"):
+        lines += [f"## Start here - Task {active['position']}: {active['title']}",
+                  "Tools for your current task: " + ", ".join(active["tools"]), ""]
+    seen: set[str] = set()
     for i, t in enumerate(tools, 1):
         uses = tasks_using(t["name"], tasks)
         lines.append(f"## {i}. {t['name']}  (needed for: {_task_ref(uses)})")
         es = find_entries(t["name"])
         for e in es:
-            lines.append(f"Official documentation - {e.official[0]}: {e.official[1]}")
-            lines += [f"Start with: {ti} - {s}: {u}" for ti, u, s in e.links[:2] if u != e.official[1]]
+            lines += entry_lines(e, seen, 2)
         if not es:
             lines.append("No curated link stored - search the official documentation site.")
+        elif not any(x.startswith(("Official", "Start")) for x in lines[-6:]):
+            lines.append("Same resources as listed above.")
         lines.append("")
     return "\n".join(lines).strip()
 
@@ -324,13 +414,13 @@ def learning_path(project: dict, tools: list[dict], tasks: list[dict]) -> str:
 def chat_block(tools: list[dict], tasks: list[dict], max_tools: int = 12) -> str:
     """Deterministic 'Recommended tools and where to learn them' block shown with the project plan."""
     lines = ["## Recommended tools and where to learn them"]
+    seen: set[str] = set()
     for t in tools[:max_tools]:
         es = find_entries(t["name"])
         uses = tasks_using(t["name"], tasks)
         lines.append(f"**{t['name']}** - {t['detail'] or (es[0].what if es else '')}  (used in: {_task_ref(uses)})")
         for e in es:
-            lines.append(f"Official docs - {e.official[0]}: {e.official[1]}")
-            lines += [f"Learn: {ti} - {s}: {u}" for ti, u, s in e.links[:2] if u != e.official[1]]
+            lines += entry_lines(e, seen, 2)
         if not es:
             lines.append("No curated link available - search the official documentation site.")
     lines.append("Full notes for every tool are in the Learning Resources section.")
